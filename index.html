@@ -117,7 +117,7 @@
   .hud-group {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 10px;
     flex-wrap: wrap;
   }
   .hearts { color: #ff4d5a; font-size: 1.05rem; letter-spacing: 2px; }
@@ -129,10 +129,17 @@
     gap: 6px;
     padding: 4px 10px;
     border-radius: 999px;
-    font-size: 0.78rem;
+    font-size: 0.76rem;
     font-weight: 800;
     border: 1px solid rgba(255,255,255,0.2);
     background: #1b2333;
+  }
+  .form-badge.low-time {
+    animation: pulseWarn 0.5s infinite alternate;
+  }
+  @keyframes pulseWarn {
+    from { opacity: 1; }
+    to { opacity: 0.55; }
   }
 
   .canvas-wrap {
@@ -166,6 +173,33 @@
   .overlay-banner.hidden { display: none; }
   .overlay-banner h2 { margin: 0; font-size: 1.6rem; }
   .overlay-banner p { margin: 0; color: #cbd5e1; max-width: 490px; font-size: 0.87rem; line-height: 1.55; }
+
+  .pause-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(7, 10, 18, 0.52);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    z-index: 4;
+  }
+  .pause-overlay.hidden { display: none; }
+  .pause-box {
+    background: rgba(15, 23, 42, 0.94);
+    border: 2px solid #38bdf8;
+    border-radius: 12px;
+    padding: 16px 26px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  }
+  .pause-box h3 { margin: 0; font-size: 1.15rem; color: #e2e8f0; }
+
   .btn-primary {
     background: linear-gradient(135deg, #38bdf8, #6366f1);
     color: #fff;
@@ -180,6 +214,27 @@
     transition: transform 0.12s;
   }
   .btn-primary:hover { transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+  .btn-resume-puzzle {
+    width: 100%;
+    padding: 9px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: #1a2335;
+    color: var(--text);
+    font-weight: 800;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .btn-resume-puzzle.paused-state {
+    background: linear-gradient(135deg, #10b981, #0ea5e9);
+    border-color: #7dd3fc;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(14, 165, 233, 0.35);
+  }
+  .btn-resume-puzzle:disabled { opacity: 0.4; cursor: not-allowed; }
 
   /* 5 Color Action Slots */
   .form-bar {
@@ -191,12 +246,13 @@
     background: #101520;
     border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 6px 4px;
+    padding: 6px 4px 8px;
     text-align: center;
     cursor: pointer;
     transition: all 0.14s;
     position: relative;
     opacity: 0.48;
+    overflow: hidden;
   }
   .form-slot.ready { opacity: 1; background: #161e2e; }
   .form-slot.ready:hover { transform: translateY(-2px); border-color: #64748b; }
@@ -210,19 +266,31 @@
     top: 3px; left: 5px;
     font-size: 0.65rem; color: var(--muted); font-weight: 700;
   }
-  .form-slot .charge-badge {
+  .form-slot .time-badge {
     position: absolute;
-    top: 3px; right: 5px;
-    font-size: 0.68rem;
+    top: 3px; right: 4px;
+    font-size: 0.66rem;
     font-weight: 900;
     padding: 1px 5px;
     border-radius: 999px;
     background: #0b0f18;
     border: 1px solid #334155;
+    font-variant-numeric: tabular-nums;
   }
   .form-slot .f-icon { font-size: 1.15rem; margin-top: 2px; }
   .form-slot .f-name { font-size: 0.72rem; font-weight: 800; margin-top: 1px; }
-  .form-slot .f-act { font-size: 0.63rem; color: var(--muted); }
+  .form-slot .f-act { font-size: 0.61rem; color: var(--muted); }
+  .form-slot .time-bar-track {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 3px;
+    background: #0b0f18;
+  }
+  .form-slot .time-bar-fill {
+    height: 100%;
+    width: 0%;
+    transition: width 0.1s linear;
+  }
 
   .controls-hint {
     display: flex;
@@ -349,7 +417,7 @@
 
   .match-toast {
     position: absolute;
-    top: 8px;
+    top: -32px;
     left: 50%;
     transform: translateX(-50%);
     background: rgba(15, 23, 42, 0.94);
@@ -361,10 +429,10 @@
     pointer-events: none;
     z-index: 10;
     opacity: 0;
-    transition: opacity 0.2s, top 0.2s;
+    transition: opacity 0.22s, top 0.26s cubic-bezier(0.22, 1, 0.36, 1);
     white-space: nowrap;
   }
-  .match-toast.show { opacity: 1; top: 12px; }
+  .match-toast.show { opacity: 1; top: 10px; }
 
   /* Grid & Gems */
   .grid-container {
@@ -408,10 +476,34 @@
     box-shadow: none !important;
     cursor: default;
   }
+  .gem-cell.junk-block {
+    background: linear-gradient(145deg, #475569, #1e293b);
+    border: 2px solid #ef4444;
+    box-shadow: inset 0 0 8px rgba(0,0,0,0.65), 0 0 8px rgba(239,68,68,0.3);
+    cursor: not-allowed;
+    font-size: 1.25rem;
+  }
+  .gem-cell.junk-block.junk-movable {
+    cursor: pointer;
+    border-color: #f87171;
+  }
   .gem-cell.popping {
     transform: scale(1.22);
     filter: brightness(1.7);
     box-shadow: 0 0 18px #fff;
+  }
+  .gem-cell.dropping {
+    animation: gemDropDown 0.25s cubic-bezier(0.22, 0.9, 0.36, 1) backwards;
+  }
+  @keyframes gemDropDown {
+    from {
+      transform: translateY(var(--drop-y, -53px));
+      opacity: 0.72;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
   }
   .gem-cell.invalid {
     animation: shakeCell 0.25s;
@@ -508,7 +600,7 @@
 <header>
   <div class="brand">
     <span>⚡ PUZZLE SHIFT KNIGHT</span>
-    <span class="badge">色専用ギミック × 3つ揃え5種パズル</span>
+    <span class="badge">隠し連携ルート × 時間延長 × 5種パズル</span>
   </div>
   <div class="header-controls">
     <button class="btn-sm active" id="btnStage1" onclick="game.loadStage(0); this.blur()">STAGE 1</button>
@@ -536,6 +628,12 @@
 
     <div class="canvas-wrap">
       <canvas id="gameCanvas" width="640" height="416"></canvas>
+      <div class="pause-overlay hidden" id="pauseOverlay">
+        <div class="pause-box">
+          <h3>⏸ PAUSE（パズル中）</h3>
+          <button class="btn-primary" id="btnResumeCanvas" onclick="game.setPuzzlePaused(false); this.blur()">▶ 一時停止を解除</button>
+        </div>
+      </div>
       <div class="overlay-banner" id="overlayBanner">
         <h2 id="overlayTitle">PUZZLE SHIFT KNIGHT</h2>
         <p id="overlayDesc"></p>
@@ -586,12 +684,15 @@
       <div id="puzzleBoard"></div>
     </div>
 
+    <button class="btn-resume-puzzle" id="btnResumePuzzle" disabled onclick="game.togglePuzzlePause(); this.blur()">⏸ 一時停止してパズル</button>
+
     <div class="legend-box">
-      <div><b style="color:#ff4d5a">🔥 赤×3</b>：赤ヒビ壁を突進破壊</div>
-      <div><b style="color:#38bdf8">💧 青×3</b>：青サイン(4マス高台)を大上昇</div>
-      <div><b style="color:#34d399">🍀 緑×3</b>：横穴の的を撃って緑ゲート開放</div>
-      <div><b style="color:#facc15">⚡ 黄×3</b>：電流床を歩き放電でシャッター開放</div>
-      <div style="grid-column:span 2"><b style="color:#c084fc">🌀 紫×3</b>：紫の位相バリアを瞬間ワープで通り抜け</div>
+      <div><b style="color:#ff4d5a">🔥 赤×3</b>：赤壁破壊＋突進＆高速移動(+時間延長)</div>
+      <div><b style="color:#38bdf8">💧 青×3</b>：3段跳＆大上昇、上昇中にACTで急降下攻撃(+時間延長)</div>
+      <div><b style="color:#34d399">🍀 緑×3</b>：的を起動＆連射レーザー(+時間延長)</div>
+      <div><b style="color:#facc15">⚡ 黄×3</b>：電流無効・疾走＆放電バリア(+時間延長)</div>
+      <div><b style="color:#c084fc">🌀 紫×3</b>：壁抜けワープ斬り(+時間延長)</div>
+      <div><b style="color:#7dd3fc">💎 隠し</b>：複数色コンボで上空の秘密ルートへ！</div>
     </div>
   </section>
 </div>
@@ -683,6 +784,18 @@ class SoundEngine {
         gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
         osc.start(now); osc.stop(now + 0.15);
         break;
+      case 'gem':
+        [660, 880, 1320].forEach((f, i) => {
+          const o = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          o.type = 'sine';
+          o.connect(g); g.connect(this.ctx.destination);
+          o.frequency.setValueAtTime(f, now + i * 0.05);
+          g.gain.setValueAtTime(0.12, now + i * 0.05);
+          g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.05 + 0.22);
+          o.start(now + i * 0.05); o.stop(now + i * 0.05 + 0.23);
+        });
+        return;
       case 'hit':
         osc.type = 'sawtooth';
         osc.frequency.setValueAtTime(160, now);
@@ -733,78 +846,102 @@ const sfx = new SoundEngine();
    2. COLOR FORMS & 5 PUZZLE MODES DATA
    ========================================================= */
 const COLORS = [
-  { id: 0, formId: 1, name: 'ブレイカー', icon: '🔥', color: '#ff4d5a', actionName: '突進ブレイク' },
-  { id: 1, formId: 2, name: 'スカイ',     icon: '💧', color: '#38bdf8', actionName: '大上昇ウイング' },
-  { id: 2, formId: 3, name: 'シューター', icon: '🍀', color: '#34d399', actionName: 'レーザー射撃' },
-  { id: 3, formId: 4, name: 'エレキ',     icon: '⚡', color: '#facc15', actionName: '放電バリア' },
-  { id: 4, formId: 5, name: 'シャドウ',   icon: '🌀', color: '#c084fc', actionName: '壁抜けワープ' }
+  { id: 0, formId: 1, name: 'ブレイカー', icon: '🔥', color: '#ff4d5a', actionName: '突進＆加速' },
+  { id: 1, formId: 2, name: 'スカイ',     icon: '💧', color: '#38bdf8', actionName: '上昇＆スカイダイブ' },
+  { id: 2, formId: 3, name: 'シューター', icon: '🍀', color: '#34d399', actionName: '連射レーザー' },
+  { id: 3, formId: 4, name: 'エレキ',     icon: '⚡', color: '#facc15', actionName: '疾走＆放電' },
+  { id: 4, formId: 5, name: 'シャドウ',   icon: '🌀', color: '#c084fc', actionName: 'ワープ斬り' }
 ];
 
+/* パズルごとの時間延長ボーナス（揃えた色1色あたり、秒）
+   ① スワップ +3（基準） / ② スライド +7（空きマス経由で揃える手数が一番多い）
+   ③ 2×2回転 +5（4マス同時回転の調整が必要） / ④ ループ・シフト +4（1手で行・列全体が動く）
+   ⑤ カラーチェンジ +6（十字の色が連動して変わるため狙い通りに揃えにくい） */
 const PUZZLE_MODES = {
   1: {
     id: 1, short: '入替', icon: '⇄',
     title: '① スワップ・マッチ (隣接入替)',
     desc: '隣り合う2マスを選んで入れ替え、同じ色を縦横に3つ揃えよう！',
     styleName: '剣士スタイル',
-    styleBuff: 'スタイル効果: 3つ揃えた時の獲得アクション回数 +1ボーナス！'
+    timeBonusSec: 3,
+    styleBuff: 'スタイル効果: 3つ揃えた時の時間延長 +3秒ボーナス！'
   },
   2: {
     id: 2, short: 'スライド', icon: '⊞',
     title: '② スライド・マッチ (空きマス移動)',
     desc: '黒い空きマスの上下左右をクリックしてスライド！同じ色を3つ揃えよう！',
     styleName: '重装スタイル',
-    styleBuff: 'スタイル効果: ダメージ後の無敵時間が延長＆落下着地が素早い！'
+    timeBonusSec: 7,
+    styleBuff: 'スタイル効果: 時間延長 +7秒！ダメージ後の無敵時間が延長＆落下着地が素早い！'
   },
   3: {
     id: 3, short: '2×2回転', icon: '↻',
     title: '③ ギア・ローテート (4マス回転)',
     desc: 'マスの間にある「↻」を押すと周囲4マスが時計回りに回転！3つ揃えよう！',
     styleName: '空戦スタイル',
-    styleBuff: 'スタイル効果: 基本の空中制御が滑らか＆微ジャンプUP！'
+    timeBonusSec: 5,
+    styleBuff: 'スタイル効果: 時間延長 +5秒！基本の空中制御が滑らか＆微ジャンプUP！'
   },
   4: {
     id: 4, short: '行列シフト', icon: '⇕',
     title: '④ ループ・シフト (行/列スライド)',
     desc: '外枠の矢印を押すとその行・列が1マス循環シフト！同じ色を3つ揃えよう！',
     styleName: '疾風スタイル',
-    styleBuff: 'スタイル効果: 基本の移動スピードがアップ！'
+    timeBonusSec: 4,
+    styleBuff: 'スタイル効果: 時間延長 +4秒！基本の移動スピードがさらにアップ！'
   },
   5: {
     id: 5, short: '色変化', icon: '✦',
     title: '⑤ カラーチェンジ (十字色送り)',
     desc: 'マスを押すと自分と上下左右の色が変化(🔥→💧→🍀→⚡→🌀)。3つ揃えよう！',
     styleName: '魔導スタイル',
-    styleBuff: 'スタイル効果: 特殊アクションのクールダウン短縮！'
+    timeBonusSec: 6,
+    styleBuff: 'スタイル効果: 時間延長 +6秒！特殊アクションのクールダウン短縮！'
   }
 };
 
 /* =========================================================
-   3. 5-IN-1 MATCH-3 PUZZLE MANAGER
+   3. 5-IN-1 MATCH-3 PUZZLE MANAGER (WITH JUNK BLOCKS)
    ========================================================= */
+const JUNK = -3;
+
 class MatchPuzzleManager {
   constructor() {
     this.N = 5;
     this.mode = 1;
-    this.active = false; // Locked until START is pressed!
+    this.active = false;
     this.boards = {};
     this.selected = null;
     this.busy = false;
     this.poppingSet = new Set();
+    this.dropMap = null;
 
     for (let m = 1; m <= 5; m++) {
-      this.boards[m] = this.createInitialBoard(m);
+      this.boards[m] = this.createInitialBoard(m, 0);
     }
     this.renderTabs();
     this.selectMode(1, true);
     this.setActive(false);
   }
 
+  triggerFullDrop() {
+    this.dropMap = Array.from({ length: this.N }, (_, r) =>
+      Array.from({ length: this.N }, () => r + 2)
+    );
+  }
+
   setActive(flag) {
+    const wasActive = this.active;
     this.active = flag;
     const overlay = document.getElementById('puzzleLockOverlay');
     const btnReset = document.getElementById('btnReshuffle');
     if (overlay) overlay.classList.toggle('hidden', flag);
     if (btnReset) btnReset.disabled = !flag;
+    if (flag && !wasActive) {
+      this.triggerFullDrop();
+      this.renderBoard();
+    }
+    if (window.game) game.syncPauseUI();
   }
 
   resetAllBoards() {
@@ -812,18 +949,81 @@ class MatchPuzzleManager {
     this.busy = false;
     this.poppingSet = new Set();
     for (let m = 1; m <= 5; m++) {
-      this.boards[m] = this.createInitialBoard(m);
+      this.boards[m] = this.createInitialBoard(m, 0);
+    }
+    this.triggerFullDrop();
+    this.renderBoard();
+  }
+
+  countJunk(b) {
+    let cnt = 0;
+    for (let r = 0; r < this.N; r++)
+      for (let c = 0; c < this.N; c++)
+        if (b[r][c] === JUNK) cnt++;
+    return cnt;
+  }
+
+  addJunkOnDamage() {
+    if (!this.active) return;
+    const drops = Array.from({ length: this.N }, () => Array(this.N).fill(0));
+    let addedOnCurrent = 0;
+
+    for (let m = 1; m <= 5; m++) {
+      const b = this.boards[m];
+      const countToAdd = (m === this.mode) ? 2 : 1;
+      for (let k = 0; k < countToAdd; k++) {
+        if (this.countJunk(b) >= 8) break;
+        const candidates = [];
+        for (let r = 0; r < this.N; r++) {
+          for (let c = 0; c < this.N; c++) {
+            if (b[r][c] >= 0) candidates.push([r, c]);
+          }
+        }
+        if (!candidates.length) break;
+        const [rr, cc] = candidates[Math.floor(Math.random() * candidates.length)];
+        b[rr][cc] = JUNK;
+        if (m === this.mode) {
+          drops[rr][cc] = rr + 2;
+          addedOnCurrent++;
+        }
+      }
+      if (m === 1 && !this.hasValidSwapMove(b)) {
+        this.boards[1] = this.createInitialBoard(1, this.countJunk(b));
+      }
+    }
+
+    if (this.selected) {
+      const [sr, sc] = this.selected;
+      if (this.boards[this.mode][sr][sc] === JUNK) this.selected = null;
+    }
+
+    if (addedOnCurrent > 0) {
+      this.dropMap = drops;
+      this.showToast(`🪨 被弾！お邪魔ブロック ×${addedOnCurrent} 追加！`, '#f87171');
     }
     this.renderBoard();
   }
 
-  createInitialBoard(mode) {
+  createInitialBoard(mode, junkCount = 0) {
     let b;
-    for (let attempt = 0; attempt < 80; attempt++) {
+    const maxJunk = Math.min(junkCount, 8);
+    for (let attempt = 0; attempt < 90; attempt++) {
       b = Array.from({ length: this.N }, () =>
         Array.from({ length: this.N }, () => Math.floor(Math.random() * 5))
       );
       if (mode === 2) b[4][4] = -1;
+
+      let placed = 0;
+      let guard = 0;
+      while (placed < maxJunk && guard < 100) {
+        guard++;
+        const r = Math.floor(Math.random() * this.N);
+        const c = Math.floor(Math.random() * this.N);
+        if (b[r][c] >= 0) {
+          b[r][c] = JUNK;
+          placed++;
+        }
+      }
 
       for (let r = 0; r < this.N; r++) {
         for (let c = 0; c < this.N; c++) {
@@ -856,6 +1056,7 @@ class MatchPuzzleManager {
 
   hasValidSwapMove(b) {
     const test = (r1, c1, r2, c2) => {
+      if (b[r1][c1] < 0 || b[r2][c2] < 0) return false;
       [b[r1][c1], b[r2][c2]] = [b[r2][c2], b[r1][c1]];
       const ok = this.findMatches(b).matchedCells.size > 0;
       [b[r1][c1], b[r2][c2]] = [b[r2][c2], b[r1][c1]];
@@ -872,6 +1073,7 @@ class MatchPuzzleManager {
 
   findMatches(b) {
     const matchedCells = new Set();
+    const adjacentJunk = new Set();
     const colorCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
 
     for (let r = 0; r < this.N; r++) {
@@ -900,9 +1102,15 @@ class MatchPuzzleManager {
     matchedCells.forEach(key => {
       const [r, c] = key.split(',').map(Number);
       if (b[r][c] >= 0) colorCounts[b[r][c]]++;
+      [[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr, dc]) => {
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < this.N && nc >= 0 && nc < this.N && b[nr][nc] === JUNK) {
+          adjacentJunk.add(`${nr},${nc}`);
+        }
+      });
     });
 
-    return { matchedCells, colorCounts };
+    return { matchedCells, adjacentJunk, colorCounts };
   }
 
   selectMode(modeId, silent = false) {
@@ -914,6 +1122,7 @@ class MatchPuzzleManager {
     document.getElementById('puzzleDesc').textContent = pm.desc;
     document.getElementById('styleBuffBar').innerHTML = `<b>${pm.styleName}</b> — ${pm.styleBuff}`;
     this.renderTabs();
+    if (this.active) this.triggerFullDrop();
     this.renderBoard();
     if (window.game && this.active) game.onPuzzleStyleChanged(modeId);
     if (!silent) sfx.play('click');
@@ -922,8 +1131,10 @@ class MatchPuzzleManager {
   reshuffle() {
     if (!this.active || this.busy) return;
     this.selected = null;
-    this.boards[this.mode] = this.createInitialBoard(this.mode);
+    const junks = this.countJunk(this.boards[this.mode]);
+    this.boards[this.mode] = this.createInitialBoard(this.mode, junks);
     sfx.play('click');
+    this.triggerFullDrop();
     this.renderBoard();
   }
 
@@ -934,7 +1145,7 @@ class MatchPuzzleManager {
       const pm = PUZZLE_MODES[m];
       const btn = document.createElement('button');
       btn.className = 'p-tab' + (this.mode === m ? ' active' : '');
-      btn.innerHTML = `<span style="font-size:1.05rem">${pm.icon}</span><span>${pm.short}</span>`;
+      btn.innerHTML = `<span style="font-size:1.05rem">${pm.icon}</span><span>${pm.short}</span><span style="font-size:0.62rem;color:#7dd3fc">+${pm.timeBonusSec}秒</span>`;
       btn.onclick = () => { this.selectMode(m); btn.blur(); };
       wrap.appendChild(btn);
     }
@@ -947,42 +1158,50 @@ class MatchPuzzleManager {
     el.style.borderColor = color;
     el.classList.add('show');
     clearTimeout(this.toastTimer);
-    this.toastTimer = setTimeout(() => el.classList.remove('show'), 1450);
+    this.toastTimer = setTimeout(() => el.classList.remove('show'), 1550);
   }
 
   resolveMatches(combo = 1) {
     if (!this.active) { this.busy = false; return; }
     const b = this.boards[this.mode];
-    const { matchedCells, colorCounts } = this.findMatches(b);
+    const { matchedCells, adjacentJunk, colorCounts } = this.findMatches(b);
     if (matchedCells.size === 0) {
       this.busy = false;
       if (this.mode === 1 && !this.hasValidSwapMove(b)) {
-        this.boards[1] = this.createInitialBoard(1);
+        const junks = this.countJunk(b);
+        this.boards[1] = this.createInitialBoard(1, junks);
+        this.triggerFullDrop();
         this.showToast('手詰まりのため盤面シャッフル！', '#94a3b8');
       }
+      if (window.game) game.syncPauseUI();
       this.renderBoard();
       return;
     }
 
     this.busy = true;
-    this.poppingSet = matchedCells;
+    if (window.game) game.syncPauseUI();
+    this.poppingSet = new Set([...matchedCells, ...adjacentJunk]);
     sfx.play('match', combo);
+    if (adjacentJunk.size > 0) sfx.play('break');
     this.renderBoard();
 
-    const styleBonus = this.mode === 1 ? 1 : 0;
+    // パズルごとに異なる時間延長ボーナス（PUZZLE_MODES.timeBonusSec）
+    const styleBonusSec = PUZZLE_MODES[this.mode].timeBonusSec || 0;
     const msgs = [];
     for (let col = 0; col < 5; col++) {
       const cnt = colorCounts[col];
       if (cnt >= 3) {
-        const gain = cnt + styleBonus + (combo > 1 ? combo - 1 : 0);
+        const baseSec = 12 + (cnt - 3) * 4;
+        const addSec = baseSec + (combo > 1 ? (combo - 1) * 4 : 0) + styleBonusSec;
         const cInfo = COLORS[col];
-        game.grantColorCharge(cInfo.formId, gain);
-        msgs.push(`${cInfo.icon}${cInfo.name}+${gain}`);
+        game.extendColorTime(cInfo.formId, addSec);
+        msgs.push(`${cInfo.icon}${cInfo.name} +${addSec}秒`);
       }
     }
     if (msgs.length) {
       const firstCol = Object.keys(colorCounts).find(k => colorCounts[k] >= 3);
-      const toastText = (combo > 1 ? `${combo}連鎖! ` : '') + msgs.join(' / ') + ' アクション可能！';
+      const junkMsg = adjacentJunk.size > 0 ? ` (🪨×${adjacentJunk.size}破壊!)` : '';
+      const toastText = (combo > 1 ? `${combo}連鎖! ` : '') + msgs.join(' / ') + ' 延長！' + junkMsg;
       this.showToast(toastText, COLORS[firstCol || 0].color);
     }
 
@@ -992,31 +1211,50 @@ class MatchPuzzleManager {
         const [r, c] = key.split(',').map(Number);
         b[r][c] = -2;
       });
+      adjacentJunk.forEach(key => {
+        const [r, c] = key.split(',').map(Number);
+        b[r][c] = -2;
+      });
       this.poppingSet = new Set();
 
+      const drops = Array.from({ length: this.N }, () => Array(this.N).fill(0));
       for (let c = 0; c < this.N; c++) {
-        const colVals = [];
+        const survivors = [];
         for (let r = this.N - 1; r >= 0; r--) {
-          if (b[r][c] !== -2) colVals.push(b[r][c]);
+          if (b[r][c] !== -2) survivors.push({ val: b[r][c], oldR: r });
         }
-        while (colVals.length < this.N) {
-          colVals.push(this.pickBalancedColor(b));
-        }
+        let spawnIdx = 1;
         for (let r = this.N - 1; r >= 0; r--) {
-          b[r][c] = colVals[this.N - 1 - r];
+          const sIdx = this.N - 1 - r;
+          if (sIdx < survivors.length) {
+            b[r][c] = survivors[sIdx].val;
+            drops[r][c] = r - survivors[sIdx].oldR;
+          } else {
+            b[r][c] = this.pickBalancedColor(b);
+            drops[r][c] = r - (-spawnIdx);
+            spawnIdx++;
+          }
         }
       }
+      this.dropMap = drops;
 
       this.renderBoard();
-      setTimeout(() => this.resolveMatches(combo + 1), 160);
+      setTimeout(() => this.resolveMatches(combo + 1), 270);
     }, 230);
   }
 
   handleCellClick(r, c) {
     if (!this.active || this.busy) return;
+    if (window.game && game.running) game.setPuzzlePaused(true);
     const b = this.boards[this.mode];
 
     if (this.mode === 1) {
+      if (b[r][c] < 0) {
+        sfx.play('hit');
+        const cells = document.querySelectorAll('.gem-cell');
+        if (cells[r * 5 + c]) cells[r * 5 + c].classList.add('invalid');
+        return;
+      }
       if (!this.selected) {
         this.selected = [r, c];
         sfx.play('click');
@@ -1048,7 +1286,7 @@ class MatchPuzzleManager {
         this.renderBoard();
       }
     } else if (this.mode === 2) {
-      if (b[r][c] < 0) return;
+      if (b[r][c] === -1) return;
       let er = -1, ec = -1;
       for (let rr = 0; rr < this.N; rr++)
         for (let cc = 0; cc < this.N; cc++)
@@ -1060,6 +1298,12 @@ class MatchPuzzleManager {
         this.resolveMatches(1);
       }
     } else if (this.mode === 5) {
+      if (b[r][c] === JUNK) {
+        sfx.play('hit');
+        const cells = document.querySelectorAll('.gem-cell');
+        if (cells[r * 5 + c]) cells[r * 5 + c].classList.add('invalid');
+        return;
+      }
       [[0,0],[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr, dc]) => {
         const nr = r + dr, nc = c + dc;
         if (nr >= 0 && nr < this.N && nc >= 0 && nc < this.N && b[nr][nc] >= 0) {
@@ -1073,6 +1317,7 @@ class MatchPuzzleManager {
 
   handleRotate2x2(r, c) {
     if (!this.active || this.busy) return;
+    if (window.game && game.running) game.setPuzzlePaused(true);
     const b = this.boards[3];
     const tmp = b[r][c];
     b[r][c] = b[r + 1][c];
@@ -1085,6 +1330,7 @@ class MatchPuzzleManager {
 
   handleShift(type, idx, dir) {
     if (!this.active || this.busy) return;
+    if (window.game && game.running) game.setPuzzlePaused(true);
     const b = this.boards[4];
     if (type === 'row') {
       const row = b[idx];
@@ -1109,6 +1355,8 @@ class MatchPuzzleManager {
     const container = document.getElementById('puzzleBoard');
     container.innerHTML = '';
     const b = this.boards[this.mode];
+    const drops = this.dropMap;
+    this.dropMap = null;
 
     let er = -1, ec = -1;
     if (this.mode === 2) {
@@ -1127,16 +1375,30 @@ class MatchPuzzleManager {
         for (let c = 0; c < this.N; c++) {
           const val = b[r][c];
           const cell = document.createElement('div');
+          const dropRows = drops ? drops[r][c] : 0;
+          const isPop = this.poppingSet.has(`${r},${c}`);
+
           if (val === -1) {
             cell.className = 'gem-cell empty-slot';
+          } else if (val === JUNK) {
+            const isMov = this.mode === 2 && Math.abs(r - er) + Math.abs(c - ec) === 1;
+            cell.className = 'gem-cell junk-block'
+              + (isMov ? ' junk-movable movable' : '')
+              + (isPop ? ' popping' : '')
+              + (dropRows > 0 ? ' dropping' : '');
+            if (dropRows > 0) cell.style.setProperty('--drop-y', `${-dropRows * 53}px`);
+            cell.textContent = '🪨';
+            cell.title = 'お邪魔ブロック：隣で3つ揃えると砕けます';
+            cell.onclick = () => this.handleCellClick(r, c);
           } else {
             const isSel = this.selected && this.selected[0] === r && this.selected[1] === c;
             const isMov = this.mode === 2 && Math.abs(r - er) + Math.abs(c - ec) === 1;
-            const isPop = this.poppingSet.has(`${r},${c}`);
             cell.className = `gem-cell gem-${val}`
               + (isSel ? ' selected' : '')
               + (isMov ? ' movable' : '')
-              + (isPop ? ' popping' : '');
+              + (isPop ? ' popping' : '')
+              + (dropRows > 0 ? ' dropping' : '');
+            if (dropRows > 0) cell.style.setProperty('--drop-y', `${-dropRows * 53}px`);
             cell.textContent = COLORS[val].icon;
             cell.onclick = () => this.handleCellClick(r, c);
           }
@@ -1222,68 +1484,78 @@ class MatchPuzzleManager {
 }
 
 /* =========================================================
-   4. STAGE MAPS - STRICT COLOR-LOCKED GIMMICKS
+   4. STAGE MAPS - WITH MULTI-ACTION SECRET ROUTES
    ========================================================= */
+/*
+  * : Rare Gem (+200 pts) inside secret routes
+  + : Heart Pickup (HP +2) inside secret routes
+  ? : Secret Route Hint Sign (multi-action combo clue)
+*/
 const STAGES = [
   {
     name: 'STAGE 1: 5色の試練',
+    secretHint: '✨秘密ルート: 💧青で大上昇 → 空中で🔥赤突進 → 🌀紫ワープ！',
     map: [
-      '##########################################################################',
-      '#            R                       G                           P       #',
-      '#            R                       G                           P       #',
-      '#            R            ###        G                           P       #',
-      '#            R             T#        G                           P       #',
-      '#            R            ###        G                           P       #',
-      '#            R       B  #####        G                           P       #',
-      '#      o     R      ########         G                           P       #',
-      '#     ===    R      #                G   ####################### P       #',
-      '#            R      #       E        G   #                       P  o    #',
-      '#  @         R  o   #   o   =        G   #          C  Y         P === X #',
-      '################B####################G####SSSSSS#######Y##################',
-      '##########################################################################'
+      '##############################################################################################',
+      '#          P           M     R              R             P                   P       M   #',
+      '#          P           M     R              R             P                   P       M   #',
+      '#          P           M     R              R  *  *  *  + P  *                P       M   #',
+      '#          P           M     R            ? R             P                   P       M   #',
+      '#          P           M     R              ########################            P       M   #',
+      '#          P           M     R     B  #####   ###   G                         P       M   #',
+      '#    o     P     o     M     R      ########   T#   G                         P       M   #',
+      '#   ===    P    ===    M     R      #         ###   G #################       P       M   #',
+      '#          P           M     R      #       F       G #               Y       P  o    M   #',
+      '# @        P  E     E  M     R  o   #   E  ===      G #         C     Y       P === K M X #',
+      '######################################################SSSSSS##########Y################### ###',
+      '##############################################################################################'
     ]
   },
   {
     name: 'STAGE 2: 天空の要塞',
+    secretHint: '✨秘密ルート: ⚡黄で電流に立ち → 💧青で縦穴急上昇 → 🍀緑で的撃ち！',
     map: [
-      '################################################################################',
-      '#                     G         R                           P                  #',
-      '#                     G         R                           P                  #',
-      '#              ###    G         R                           P           B   X  #',
-      '#               T#    G         R                           P          #########',
-      '#              ###    G         R                           P          #       #',
-      '#      B   o          G   o     R                           P   o      #       #',
-      '#     #######    =    G  ===    R   H     ################# P  ===     #       #',
-      '#     #               G         R         #                 P          #       #',
-      '#     #     K         G         R         #          C  Y   P     K    #       #',
-      '#  @  #   #####   =   G         R    E    #          #  Y   P   #####  #       #',
-      '#######B##############G#########R##########SSSSSS#####  Y###P###########B#######',
-      '################################################################################'
+      '############################################################################################',
+      '#              M            G         R              ###    G                   M          #',
+      '#              M            G         R               T#    G  *   *   *   +    M          #',
+      '#              M     ###    G         R              ###    G                   M   B   X  #',
+      '#              M      T#    G         R           ?         G                   M  #########',
+      '#              M     ###    G         R         #######  #######################M  #       #',
+      '#      B   o   M            G   o     R         #      ==   #                P  M  #       #',
+      '#     #######  M       =    G  ===    R   H     #           #                P  M  #       #',
+      '#     #        M   F        G         R         #  ##########                P  M  #       #',
+      '#     #     K  M            G         R         #          C  Y       W      P  M  #       #',
+      '#  @  #   #####M   E   =    G         R    E    #          #  Y   o  ###  E  P  M  #       #',
+      '###############M############G#########R##########SSSSSS#####  Y##############P##M###########',
+      '############################################################################################'
     ]
   },
   {
     name: 'STAGE 3: 終焉のコア',
+    secretHint: '✨秘密ルート: 💧青で飛び → 🌀紫ワープ → ⚡黄放電 → 🔥赤突進！',
     map: [
-      '######################################################################################',
-      '#            R           P                     G                        R     P      #',
-      '#            R           P              ###    G                        R     P      #',
-      '#            R           P               T#    G                        R     P      #',
-      '#            R           P              ###    G                        R     P      #',
-      '#            R           P      B  o           G                        R     P      #',
-      '#            R           P     ######    =     G                        R     P      #',
-      '#     o      R     F     P     #               G   ###################  R     P   X  #',
-      '#    ===     R           P     #     K         G   #                 #  R     P  ### #',
-      '#            R     E     P     #   #####       G   #          C  Y   #  R     P      #',
-      '#  @         R    ###    P  o  #           H   G   #          #  Y   #  R     P  o   #',
-      '#############R###########P######B##############G####SSSSSS#####  Y###R##R#####P#######',
-      '######################################################################################'
+      '##################################################################################################',
+      '#            R           P               M     G  P                   Y       R          M       #',
+      '#            R           P               M     G  P                   Y       R          M       #',
+      '#            R           P        ###    M     G  P  *  *  *  *  +    Y       R          M       #',
+      '#            R           P         T#    M     G  P          C        Y       R          M       #',
+      '#            R           P   B  o ###    M     G  ######SSSSSS#################          M       #',
+      '#            R           P  ######   =   M     G     ?                           F       M       #',
+      '#     o      R     F     P  #            M     G   ###################  R                M    X  #',
+      '#    ===     R           P  #     K      M     G   #                 #  R                M   ### #',
+      '#            R     E     P  #   #####  F M     G   #          C  Y   #  R           W    M       #',
+      '#  @         R    ###    P  #          H M     G   #          #  Y   #  R       o  ### E M   o   #',
+      '#############R###########P###############M#####G####SSSSSS#####  Y###R##R################M########',
+      '##################################################################################################'
     ]
   }
 ];
 
 /* =========================================================
-   5. ACTION GAME ENGINE
+   5. ACTION GAME ENGINE (TIMED ABILITY & SECRET COMBOS)
    ========================================================= */
+const MAX_FORM_FRAMES = 60 * 99;
+
 class ActionGame {
   constructor() {
     this.canvas = document.getElementById('gameCanvas');
@@ -1292,9 +1564,11 @@ class ActionGame {
     this.stageIndex = 0;
     this.score = 0;
     this.running = false;
+    this.puzzlePaused = false;
     this.puzzleStyle = 1;
     this.keys = { left: false, right: false, jump: false, action: false };
     this.prevKeys = { jump: false, action: false };
+    this._lastFormBadgeText = '';
 
     this.particles = [];
     this.projectiles = [];
@@ -1305,6 +1579,43 @@ class ActionGame {
     this.bindInputs();
     this.loadStage(0, true);
     requestAnimationFrame(() => this.loop());
+  }
+
+  setPuzzlePaused(paused) {
+    if (!this.running) paused = false;
+    if (!paused && window.puzzles && puzzles.busy) return;
+    this.puzzlePaused = paused;
+    this.syncPauseUI();
+  }
+
+  togglePuzzlePause() {
+    if (!this.running) return;
+    this.setPuzzlePaused(!this.puzzlePaused);
+  }
+
+  syncPauseUI() {
+    const overlay = document.getElementById('pauseOverlay');
+    const btnCanvas = document.getElementById('btnResumeCanvas');
+    const btnPuzzle = document.getElementById('btnResumePuzzle');
+    const busy = window.puzzles ? puzzles.busy : false;
+    const showPause = this.running && this.puzzlePaused;
+
+    if (overlay) overlay.classList.toggle('hidden', !showPause);
+    if (btnCanvas) {
+      btnCanvas.disabled = busy;
+      btnCanvas.textContent = busy ? '連鎖中...' : '▶ 一時停止を解除';
+    }
+    if (btnPuzzle) {
+      btnPuzzle.disabled = !this.running || busy;
+      btnPuzzle.classList.toggle('paused-state', showPause);
+      if (!this.running) {
+        btnPuzzle.textContent = '⏸ 一時停止してパズル';
+      } else if (showPause) {
+        btnPuzzle.textContent = busy ? '連鎖中...' : '▶ パズル終了（一時停止を解除）';
+      } else {
+        btnPuzzle.textContent = '⏸ 一時停止してパズル';
+      }
+    }
   }
 
   bindInputs() {
@@ -1339,6 +1650,13 @@ class ActionGame {
       btn.addEventListener('pointercancel', up);
     });
 
+    const boardStage = document.querySelector('.board-stage');
+    if (boardStage) {
+      boardStage.addEventListener('pointerdown', () => {
+        if (this.running && !this.puzzlePaused) this.setPuzzlePaused(true);
+      });
+    }
+
     document.getElementById('overlayBtn').onclick = () => {
       sfx.init();
       document.getElementById('overlayBanner').classList.add('hidden');
@@ -1348,6 +1666,7 @@ class ActionGame {
         this.loadStage(this.stageIndex, false);
       }
       this.running = true;
+      this.setPuzzlePaused(false);
       if (window.puzzles) puzzles.setActive(true);
     };
   }
@@ -1356,45 +1675,76 @@ class ActionGame {
     this.stageIndex = idx;
     this.stageCleared = false;
     this.gameOver = false;
+    this.puzzlePaused = false;
     [1, 2, 3].forEach(n => document.getElementById('btnStage' + n).classList.toggle('active', idx === n - 1));
 
     const data = STAGES[idx];
     document.getElementById('hudStageName').textContent = data.name;
 
     this.rows = data.map.length;
-    this.cols = data.map[0].length;
+    this.cols = Math.max(...data.map.map(s => s.length));
     this.grid = Array.from({ length: this.rows }, () => Array(this.cols).fill('.'));
     this.enemies = [];
     this.coins = [];
+    this.gems = [];
+    this.hearts = [];
+    this.secretSigns = [];
     this.targets = [];
     this.coils = [];
     this.checkpoints = [];
     this.blueSigns = [];
+    this.enemyGates = [];
     this.particles = [];
     this.projectiles = [];
     this.afterimages = [];
     this.floatingTexts = [];
 
+    const mCols = new Set();
+    const barrierCols = new Set();
+
     let startX = 64, startY = 250;
     for (let r = 0; r < this.rows; r++) {
+      const rowStr = data.map[r];
       for (let c = 0; c < this.cols; c++) {
-        const ch = data.map[r][c];
+        const ch = rowStr[c] || '#';
         const wx = c * this.TILE, wy = r * this.TILE;
         if (ch === '@') { startX = wx + 4; startY = wy + 4; }
         else if (ch === 'o') this.coins.push({ x: wx + 16, y: wy + 16, taken: false });
+        else if (ch === '*') this.gems.push({ x: wx + 16, y: wy + 16, taken: false });
+        else if (ch === '+') this.hearts.push({ x: wx + 16, y: wy + 16, taken: false });
+        else if (ch === '?') this.secretSigns.push({ x: wx + 16, y: wy + 16, shown: false });
         else if (ch === 'H') this.checkpoints.push({ x: wx, y: wy, active: false });
         else if (ch === 'B') {
           this.blueSigns.push({ x: wx, y: wy });
-          this.grid[r][c] = (r === this.rows - 2) ? '#' : '.';
+          this.grid[r][c] = '.';
+          barrierCols.add(c);
         }
         else if (ch === 'T') { this.targets.push({ r, c, x: wx + 16, y: wy + 16, hit: false }); this.grid[r][c] = 'T'; }
         else if (ch === 'C') { this.coils.push({ r, c, x: wx + 16, y: wy + 16, active: false }); this.grid[r][c] = 'C'; }
-        else if (ch === 'E') this.enemies.push({ type: 'slime', x: wx + 4, y: wy + 8, w: 24, h: 24, vx: 1.1, hp: 1 });
-        else if (ch === 'K') this.enemies.push({ type: 'knight', x: wx + 3, y: wy + 4, w: 26, h: 28, vx: -0.9, hp: 1 });
-        else if (ch === 'F') this.enemies.push({ type: 'drone', x: wx + 4, y: wy + 4, baseY: wy + 4, w: 24, h: 22, vx: 1.3, t: Math.random() * 6, hp: 1 });
-        else if (ch !== ' ') this.grid[r][c] = ch;
+        else if (ch === 'E') this.enemies.push({ type: 'slime', col: c, x: wx + 4, y: wy + 8, w: 24, h: 24, vx: 1.1, hp: 1, maxHp: 1, hitCd: 0 });
+        else if (ch === 'K') this.enemies.push({ type: 'knight', col: c, x: wx + 3, y: wy + 4, w: 26, h: 28, vx: -0.9, hp: 1, maxHp: 1, hitCd: 0 });
+        else if (ch === 'F') this.enemies.push({ type: 'drone', col: c, x: wx + 4, y: wy + 4, baseY: wy + 4, w: 24, h: 22, vx: 1.3, t: Math.random() * 6, hp: 1, maxHp: 1, hitCd: 0 });
+        else if (ch === 'W') this.enemies.push({ type: 'guardian', col: c, x: wx, y: wy - 4, w: 32, h: 36, vx: -0.8, hp: 3, maxHp: 3, hitCd: 0 });
+        else if (ch !== ' ') {
+          this.grid[r][c] = ch;
+          if (ch === 'M') mCols.add(c);
+          if (['R', 'G', 'Y', 'P'].includes(ch) && r >= 6) barrierCols.add(c);
+        }
       }
     }
+
+    const sortedM = [...mCols].sort((a, b) => a - b);
+    sortedM.forEach(mc => {
+      let zoneStart = 0;
+      for (let c = mc - 1; c >= 0; c--) {
+        if (mCols.has(c) || barrierCols.has(c)) {
+          zoneStart = c + 1;
+          break;
+        }
+      }
+      const zoneEnemies = this.enemies.filter(en => en.col >= zoneStart && en.col < mc);
+      this.enemyGates.push({ col: mc, enemies: zoneEnemies, opened: false });
+    });
 
     this.player = {
       x: startX, y: startY,
@@ -1408,24 +1758,25 @@ class ActionGame {
       hp: 5, maxHp: 5,
       invuln: 0,
       form: 0,
-      charges: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      timers: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
       actionCd: 0,
       dashTimer: 0,
+      diveTimer: 0,
       zapTimer: 0,
       hintCd: 0
     };
 
     this.cameraX = 0;
     this.renderFormBar();
-    this.updateHUD();
+    this.updateHUD(true);
 
     if (showTitle) {
       this.running = false;
       if (window.puzzles) puzzles.setActive(false);
       document.getElementById('overlayTitle').textContent = 'PUZZLE SHIFT KNIGHT';
       document.getElementById('overlayDesc').innerHTML =
-        'ステージのギミックは<b>対応する色の能力でないと突破できません！</b><br>' +
-        '<b>START</b>を押して右側の<b>5種類のパズル</b>を起動し、同じ色を縦横に3つ揃えて変身しよう！';
+        'パズルで同じ色を3つ揃えると、その色の<b>特殊アクションと強化された動きが使える時間が延長</b>されます！<br>' +
+        'さらに<b>複数のアクションを組み合わせる「上空の隠しルート（💎）」</b>も各ステージに存在します！';
       document.getElementById('overlayBtn').textContent = '▶ START';
       document.getElementById('overlayBanner').classList.remove('hidden');
     } else {
@@ -1436,6 +1787,7 @@ class ActionGame {
       }
       document.getElementById('overlayBanner').classList.add('hidden');
     }
+    this.syncPauseUI();
   }
 
   onPuzzleStyleChanged(modeId) {
@@ -1444,49 +1796,41 @@ class ActionGame {
       const pm = PUZZLE_MODES[modeId];
       this.addFloatingText(this.player.x, this.player.y - 16, `${pm.styleName}に変更!`, '#7dd3fc');
     }
-    this.updateHUD();
+    this.updateHUD(true);
   }
 
-  // Note: Solving puzzles grants action charges ONLY (no score added)
-  grantColorCharge(formId, amount) {
+  extendColorTime(formId, addSeconds) {
     const p = this.player;
-    p.charges[formId] = Math.min(99, p.charges[formId] + amount);
-
+    const prev = p.timers[formId];
+    p.timers[formId] = Math.min(MAX_FORM_FRAMES, prev + addSeconds * 60);
     p.form = formId;
-    if (formId === 2 && !p.onGround) p.jumpsLeft = Math.max(p.jumpsLeft, 1);
+    p.airSkyGrace = false;
+    if (formId === 2 && !p.onGround) {
+      p.jumpsLeft = Math.max(p.jumpsLeft, 2);
+    }
 
     const cInfo = COLORS[formId - 1];
-    this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, cInfo.color, 18);
-    this.addFloatingText(p.x, p.y - 14, `${cInfo.icon}${cInfo.name} +${amount}!`, cInfo.color);
+    this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, cInfo.color, 20);
+    this.addFloatingText(p.x - 10, p.y - 16, `${cInfo.icon}${cInfo.name} +${addSeconds}秒!`, cInfo.color);
     this.renderFormBar();
-    this.updateHUD();
+    this.updateHUD(true);
   }
 
   switchForm(formId) {
     if (!this.running) return;
     const p = this.player;
-    if (p.charges[formId] <= 0) {
+    if (p.timers[formId] <= 0) {
       const cInfo = COLORS[formId - 1];
-      this.addFloatingText(p.x, p.y - 10, `${cInfo.icon}を3つ揃えてチャージしよう!`, cInfo.color);
+      this.addFloatingText(p.x, p.y - 10, `${cInfo.icon}を3つ揃えて時間をチャージしよう!`, cInfo.color);
       return;
     }
     p.form = formId;
-    if (formId === 2 && !p.onGround) p.jumpsLeft = Math.max(p.jumpsLeft, 1);
+    if (formId === 2 && !p.onGround) {
+      p.jumpsLeft = Math.max(p.jumpsLeft, 2);
+    }
     sfx.play('click');
     this.renderFormBar();
-    this.updateHUD();
-  }
-
-  consumeCharge(formId) {
-    const p = this.player;
-    p.charges[formId] = Math.max(0, p.charges[formId] - 1);
-    if (p.charges[formId] === 0 && p.form === formId) {
-      if (formId === 2 && !p.onGround) p.airSkyGrace = true;
-      const next = [1, 2, 3, 4, 5].find(id => p.charges[id] > 0) || 0;
-      p.form = next;
-    }
-    this.renderFormBar();
-    this.updateHUD();
+    this.updateHUD(true);
   }
 
   renderFormBar() {
@@ -1494,47 +1838,81 @@ class ActionGame {
     bar.innerHTML = '';
     COLORS.forEach((cInfo) => {
       const fid = cInfo.formId;
-      const chg = this.player.charges[fid];
-      const ready = chg > 0;
+      const frames = this.player.timers[fid];
+      const ready = frames > 0;
       const active = this.player.form === fid;
+      const secText = ready ? (frames / 60).toFixed(1) + 's' : '🔒0.0s';
+      const pct = Math.min(100, (frames / (60 * 24)) * 100);
+
       const slot = document.createElement('div');
       slot.className = 'form-slot' + (ready ? ' ready' : '') + (active ? ' active' : '');
       if (active) slot.style.borderColor = cInfo.color;
       slot.innerHTML = `
         <span class="key-num">${fid}</span>
-        <span class="charge-badge" style="color:${ready ? cInfo.color : '#64748b'}">${ready ? '×' + chg : '🔒0'}</span>
+        <span class="time-badge" id="slotTime${fid}" style="color:${ready ? cInfo.color : '#64748b'}">${secText}</span>
         <div class="f-icon">${cInfo.icon}</div>
         <div class="f-name" style="color:${ready ? cInfo.color : '#64748b'}">${cInfo.name}</div>
         <div class="f-act">${cInfo.actionName}</div>
+        <div class="time-bar-track"><div class="time-bar-fill" id="slotBar${fid}" style="width:${pct}%; background:${cInfo.color}"></div></div>
       `;
       slot.onclick = () => this.switchForm(fid);
       bar.appendChild(slot);
     });
   }
 
-  updateHUD() {
-    const p = this.player;
-    document.getElementById('hudHearts').textContent = '♥'.repeat(Math.max(0, p.hp)) + '♡'.repeat(Math.max(0, p.maxHp - p.hp));
-    document.getElementById('hudScore').textContent = this.score;
+  updateSlotTimersOnly() {
+    COLORS.forEach((cInfo) => {
+      const fid = cInfo.formId;
+      const frames = this.player.timers[fid];
+      const timeEl = document.getElementById(`slotTime${fid}`);
+      const barEl = document.getElementById(`slotBar${fid}`);
+      if (timeEl) {
+        const text = frames > 0 ? (frames / 60).toFixed(1) + 's' : '🔒0.0s';
+        if (timeEl.textContent !== text) timeEl.textContent = text;
+      }
+      if (barEl) {
+        const pct = Math.min(100, (frames / (60 * 24)) * 100);
+        barEl.style.width = `${pct}%`;
+      }
+    });
+  }
 
-    const pm = PUZZLE_MODES[this.puzzleStyle];
-    document.getElementById('hudStyleBadge').textContent = `${pm.icon} ${pm.styleName}`;
+  updateHUD(force = false) {
+    const p = this.player;
+    if (force) {
+      document.getElementById('hudHearts').textContent = '♥'.repeat(Math.max(0, p.hp)) + '♡'.repeat(Math.max(0, p.maxHp - p.hp));
+      document.getElementById('hudScore').textContent = this.score;
+      const pm = PUZZLE_MODES[this.puzzleStyle];
+      document.getElementById('hudStyleBadge').textContent = `${pm.icon} ${pm.styleName}`;
+    }
 
     const badge = document.getElementById('hudFormBadge');
+    let nextText = '';
     if (p.form === 0) {
-      badge.textContent = '⚪ ノーマル (3つ揃えて変身)';
-      badge.style.borderColor = '#64748b';
-      badge.style.color = '#cbd5e1';
+      nextText = '⚪ ノーマル (3つ揃えて変身)';
+      if (force || this._lastFormBadgeText !== nextText) {
+        badge.textContent = nextText;
+        badge.style.borderColor = '#64748b';
+        badge.style.color = '#cbd5e1';
+        badge.classList.remove('low-time');
+        this._lastFormBadgeText = nextText;
+      }
     } else {
       const cInfo = COLORS[p.form - 1];
-      badge.textContent = `${cInfo.icon} ${cInfo.name} (残 ${p.charges[p.form]})`;
-      badge.style.borderColor = cInfo.color;
-      badge.style.color = cInfo.color;
+      const sec = (p.timers[p.form] / 60).toFixed(1);
+      nextText = `${cInfo.icon} ${cInfo.name} (${sec}s)`;
+      if (force || this._lastFormBadgeText !== nextText) {
+        badge.textContent = nextText;
+        badge.style.borderColor = cInfo.color;
+        badge.style.color = cInfo.color;
+        badge.classList.toggle('low-time', p.timers[p.form] > 0 && p.timers[p.form] <= 180);
+        this._lastFormBadgeText = nextText;
+      }
     }
   }
 
   addFloatingText(x, y, text, color = '#fff') {
-    this.floatingTexts.push({ x, y, text, color, life: 70 });
+    this.floatingTexts.push({ x, y, text, color, life: 75 });
   }
 
   spawnBurst(x, y, color, count = 14) {
@@ -1552,7 +1930,7 @@ class ActionGame {
     if (r < 0 || r >= this.rows || c < 0 || c >= this.cols) return true;
     const ch = this.grid[r][c];
     if (ch === 'P' && ignorePhase) return false;
-    return ['#', 'R', 'G', 'Y', 'P'].includes(ch);
+    return ['#', 'R', 'G', 'Y', 'P', 'M'].includes(ch);
   }
 
   isPlatform(r, c) {
@@ -1560,13 +1938,54 @@ class ActionGame {
     return this.grid[r][c] === '=';
   }
 
+  hitEnemy(en, dmg = 1, color = '#fb923c') {
+    if (en.dead || en.hitCd > 0) return false;
+    en.hp -= dmg;
+    en.hitCd = 16;
+    const ex = en.x + en.w / 2, ey = en.y + en.h / 2;
+    if (en.hp <= 0) {
+      en.dead = true;
+      this.score += en.type === 'guardian' ? 300 : 100;
+      sfx.play('break');
+      this.spawnBurst(ex, ey, color, en.type === 'guardian' ? 24 : 14);
+      if (en.type === 'guardian') this.addFloatingText(en.x - 10, en.y - 12, 'ガーディアン撃破!', '#fde047');
+    } else {
+      sfx.play('hit');
+      this.spawnBurst(ex, ey, '#fff', 8);
+      this.addFloatingText(en.x, en.y - 10, `HP ${en.hp}/${en.maxHp}`, '#fb923c');
+    }
+    this.updateHUD(true);
+    return true;
+  }
+
+  checkEnemyGates() {
+    this.enemyGates.forEach(gate => {
+      if (gate.opened) return;
+      const alive = gate.enemies.filter(e => !e.dead).length;
+      if (alive === 0) {
+        gate.opened = true;
+        for (let r = 0; r < this.rows; r++) {
+          if (this.grid[r][gate.col] === 'M') {
+            this.grid[r][gate.col] = '.';
+            this.spawnBurst(gate.col * this.TILE + 16, r * this.TILE + 16, '#fb923c', 10);
+          }
+        }
+        this.shake = 7;
+        this.score += 150;
+        this.updateHUD(true);
+        sfx.play('break');
+        this.addFloatingText(gate.col * this.TILE - 35, 160, '⚔️ 敵全滅！封印解除！', '#fb923c');
+      }
+    });
+  }
+
   triggerSpecialAction() {
     const p = this.player;
     if (p.actionCd > 0) return;
 
-    if (p.form === 0 || p.charges[p.form] <= 0) {
+    if (p.form === 0 || p.timers[p.form] <= 0) {
       sfx.play('hit');
-      this.addFloatingText(p.x - 20, p.y - 10, '右のパズルで3つ揃えると使用可能!', '#fca5a5');
+      this.addFloatingText(p.x - 20, p.y - 10, '右のパズルで3つ揃えて時間延長!', '#fca5a5');
       p.actionCd = 20;
       return;
     }
@@ -1574,90 +1993,115 @@ class ActionGame {
     const cdScale = this.puzzleStyle === 5 ? 0.55 : 1.0;
 
     if (p.form === 1) {
-      p.dashTimer = 16;
-      p.actionCd = Math.round(24 * cdScale);
+      p.dashTimer = 17;
+      p.actionCd = Math.round(22 * cdScale);
       p.vy = 0;
       sfx.play('dash');
       this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#ff4d5a', 12);
-      this.consumeCharge(1);
     } else if (p.form === 2) {
-      p.vy = -11.2;
-      p.onGround = false;
-      p.airSkyGrace = true;
-      p.actionCd = Math.round(28 * cdScale);
-      sfx.play('jump');
-      this.spawnBurst(p.x + p.w / 2, p.y + p.h, '#38bdf8', 14);
-      this.consumeCharge(2);
+      // 青・スカイ: 上昇中に再びACTを押すとスカイダイブ(急降下攻撃)。
+      // 地上や落下中は今まで通りの大上昇。
+      if (!p.onGround && p.vy < -2) {
+        p.diveTimer = 50;
+        p.vy = 11;
+        p.vx = p.dir * 2.0;
+        p.actionCd = Math.round(24 * cdScale);
+        sfx.play('dash');
+        this.addFloatingText(p.x - 10, p.y - 16, '💧 スカイダイブ!', '#38bdf8');
+        this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#38bdf8', 14);
+      } else {
+        p.vy = -11.4;
+        p.onGround = false;
+        p.airSkyGrace = true;
+        p.actionCd = Math.round(24 * cdScale);
+        sfx.play('jump');
+        this.spawnBurst(p.x + p.w / 2, p.y + p.h, '#38bdf8', 14);
+      }
     } else if (p.form === 3) {
-      this.projectiles.push({
-        x: p.dir > 0 ? p.x + p.w : p.x - 10,
-        y: p.y + 10,
-        vx: p.dir * 9.5,
-        w: 12, h: 5, life: 60
-      });
-      p.actionCd = Math.round(14 * cdScale);
+      const spd = p.dir * 10.5;
+      const sx = p.dir > 0 ? p.x + p.w : p.x - 10;
+      this.projectiles.push({ x: sx, y: p.y + 10, vx: spd, vy: 0, w: 13, h: 5, dmg: 1, life: 60 });
+      p.actionCd = Math.round(12 * cdScale);
       sfx.play('shoot');
-      this.consumeCharge(3);
     } else if (p.form === 4) {
       p.zapTimer = 18;
-      p.actionCd = Math.round(26 * cdScale);
+      p.actionCd = Math.round(24 * cdScale);
       sfx.play('zap');
       this.shake = 5;
       const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
-      this.spawnBurst(cx, cy, '#facc15', 20);
+      const radius = 104;
+      this.spawnBurst(cx, cy, '#facc15', 22);
       this.enemies.forEach(en => {
-        if (Math.hypot(en.x + en.w / 2 - cx, en.y + en.h / 2 - cy) < 84) {
-          en.dead = true;
-          this.score += 100;
-          this.spawnBurst(en.x + en.w / 2, en.y + en.h / 2, '#facc15', 14);
+        if (Math.hypot(en.x + en.w / 2 - cx, en.y + en.h / 2 - cy) < radius) {
+          this.hitEnemy(en, 1, '#facc15');
         }
       });
       this.coils.forEach(coil => {
-        if (!coil.active && Math.hypot(coil.x - cx, coil.y - cy) < 80) {
+        if (!coil.active && Math.hypot(coil.x - cx, coil.y - cy) < radius) {
           coil.active = true;
-          this.openNearestGroup(coil.c, 'Y', '#facc15', 'シャッター開放!');
+          this.openNearestGroup(coil.c, 'Y', '#facc15', 'シャッター開放!', coil.r);
         }
       });
-      this.consumeCharge(4);
     } else if (p.form === 5) {
-      p.actionCd = Math.round(22 * cdScale);
+      p.actionCd = Math.round(18 * cdScale);
       sfx.play('warp');
       this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#c084fc', 12);
       let bestX = p.x;
-      for (let s = 1; s <= 16; s++) {
+      for (let s = 1; s <= 18; s++) {
         const tx = p.x + p.dir * s * 6;
         this.afterimages.push({ x: tx, y: p.y, color: '#c084fc', life: 12 });
         if (!this.collidesRect(tx, p.y, p.w, p.h, true)) {
           if (!this.collidesRect(tx, p.y, p.w, p.h, false)) bestX = tx;
         } else break;
       }
+      // 紫・シャドウ: ワープ斬り。ワープ経路上の敵をすり抜けざまに斬る。
+      const warpX0 = Math.min(p.x, bestX);
+      const warpX1 = Math.max(p.x, bestX) + p.w;
+      let slashed = 0;
+      this.enemies.forEach(en => {
+        if (!en.dead && en.x + en.w > warpX0 && en.x < warpX1 &&
+            en.y + en.h > p.y - 6 && en.y < p.y + p.h + 6) {
+          if (this.hitEnemy(en, 1, '#c084fc')) slashed++;
+        }
+      });
       p.x = bestX;
+      if (slashed > 0) this.addFloatingText(p.x - 10, p.y - 16, `🌀 ワープ斬り! ×${slashed}`, '#c084fc');
       this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#e9d5ff', 14);
-      this.consumeCharge(5);
     }
   }
 
-  openNearestGroup(sourceCol, charType, color, msg) {
-    let bestCol = -1, bestDist = 9999;
+  // Opens ONLY the contiguous vertical block of charType closest to (sourceRow, sourceCol)
+  openNearestGroup(sourceCol, charType, color, msg, sourceRow = 8) {
+    let bestR = -1, bestC = -1, bestDist = 99999;
     for (let r = 0; r < this.rows; r++) {
       for (let c = 0; c < this.cols; c++) {
         if (this.grid[r][c] === charType) {
-          const d = Math.abs(c - sourceCol);
-          if (d < bestDist) { bestDist = d; bestCol = c; }
+          const d = Math.abs(c - sourceCol) * 2 + Math.abs(r - sourceRow);
+          if (d < bestDist) {
+            bestDist = d;
+            bestR = r;
+            bestC = c;
+          }
         }
       }
     }
-    if (bestCol !== -1) {
-      for (let r = 0; r < this.rows; r++) {
-        if (this.grid[r][bestCol] === charType) {
-          this.grid[r][bestCol] = '.';
-          this.spawnBurst(bestCol * this.TILE + 16, r * this.TILE + 16, color, 10);
-        }
+    if (bestC !== -1) {
+      let rr = bestR;
+      while (rr >= 0 && this.grid[rr][bestC] === charType) {
+        this.grid[rr][bestC] = '.';
+        this.spawnBurst(bestC * this.TILE + 16, rr * this.TILE + 16, color, 10);
+        rr--;
+      }
+      rr = bestR + 1;
+      while (rr < this.rows && this.grid[rr][bestC] === charType) {
+        this.grid[rr][bestC] = '.';
+        this.spawnBurst(bestC * this.TILE + 16, rr * this.TILE + 16, color, 10);
+        rr++;
       }
       this.shake = 6;
       this.score += 150;
-      this.updateHUD();
-      this.addFloatingText(bestCol * this.TILE - 20, 160, msg, color);
+      this.updateHUD(true);
+      this.addFloatingText(bestC * this.TILE - 20, bestR * this.TILE, msg, color);
       sfx.play('break');
     }
   }
@@ -1694,24 +2138,35 @@ class ActionGame {
       } else if (ch === 'P' && p.form !== 5) {
         this.addFloatingText(p.x - 35, p.y - 16, '🌀 紫の瞬間ワープですり抜け！', '#c084fc');
         p.hintCd = 90;
+      } else if (ch === 'M') {
+        const g = this.enemyGates.find(gt => gt.col === frontCol);
+        const rem = g ? g.enemies.filter(e => !e.dead).length : 0;
+        this.addFloatingText(p.x - 40, p.y - 16, `⚔️ 手前の敵を全滅させよう！(残${rem}体)`, '#fb923c');
+        p.hintCd = 90;
       }
     }
   }
 
   damagePlayer(amount = 1) {
     const p = this.player;
-    if (p.invuln > 0 || p.dashTimer > 0) return;
+    if (p.invuln > 0 || p.dashTimer > 0 || p.diveTimer > 0) return;
     p.hp -= amount;
     p.invuln = this.puzzleStyle === 2 ? 95 : 65;
     p.vy = -5.0;
     this.shake = 8;
     sfx.play('hit');
     this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#ff4d5a', 16);
-    this.updateHUD();
+    this.updateHUD(true);
+
+    if (p.hp > 0 && window.puzzles) {
+      puzzles.addJunkOnDamage();
+      this.addFloatingText(p.x - 10, p.y - 24, '🪨 お邪魔追加!', '#f87171');
+    }
 
     if (p.hp <= 0) {
       this.running = false;
       this.gameOver = true;
+      this.setPuzzlePaused(false);
       if (window.puzzles) puzzles.setActive(false);
       document.getElementById('overlayTitle').textContent = 'GAME OVER';
       document.getElementById('overlayDesc').textContent = 'HPが0になりました。もう一度挑戦しよう！';
@@ -1721,8 +2176,24 @@ class ActionGame {
   }
 
   update() {
-    if (!this.running) return;
+    if (!this.running || this.puzzlePaused) return;
     const p = this.player;
+
+    if (p.form !== 0 && p.timers[p.form] > 0) {
+      p.timers[p.form]--;
+      if (p.timers[p.form] === 0) {
+        const expiredForm = p.form;
+        const cInfo = COLORS[expiredForm - 1];
+        this.addFloatingText(p.x - 10, p.y - 16, `${cInfo.icon}${cInfo.name} 時間切れ!`, '#94a3b8');
+        if (expiredForm === 2 && !p.onGround) p.airSkyGrace = true;
+        p.form = [1, 2, 3, 4, 5].find(id => p.timers[id] > 0) || 0;
+        this.renderFormBar();
+        this.updateHUD(true);
+      } else {
+        this.updateSlotTimersOnly();
+        this.updateHUD(false);
+      }
+    }
 
     if (p.invuln > 0) p.invuln--;
     if (p.actionCd > 0) p.actionCd--;
@@ -1739,16 +2210,25 @@ class ActionGame {
 
     let moveSpeed = 3.2;
     if (this.puzzleStyle === 4) moveSpeed += 0.9;
-    if (p.form === 2 || p.airSkyGrace) moveSpeed += 0.35;
-    if (p.form === 5) moveSpeed += 1.1;
+    if (p.form === 1) moveSpeed = 4.0;
+    if (p.form === 2 || p.airSkyGrace) moveSpeed = 4.0;
+    if (p.form === 3) moveSpeed = 3.9;
+    if (p.form === 4) moveSpeed = 4.4;
+    if (p.form === 5) moveSpeed = 5.0;
+    if (p.form !== 0 && this.puzzleStyle === 4) moveSpeed += 0.6;
 
     if (p.dashTimer > 0) {
       p.dashTimer--;
-      p.vx = p.dir * 8.4;
+      p.vx = p.dir * 9.0;
       p.vy = 0;
       this.afterimages.push({ x: p.x, y: p.y, color: '#ff4d5a', life: 8 });
+    } else if (p.diveTimer > 0) {
+      p.diveTimer--;
+      p.vx = p.dir * 2.0;
+      p.vy = 11;
+      this.afterimages.push({ x: p.x, y: p.y, color: '#38bdf8', life: 8 });
     } else {
-      const accel = this.puzzleStyle === 3 ? 1 : 0.72;
+      const accel = (this.puzzleStyle === 3 || p.form !== 0) ? 0.92 : 0.72;
       if (this.keys.left) { p.vx = -moveSpeed; p.dir = -1; }
       else if (this.keys.right) { p.vx = moveSpeed; p.dir = 1; }
       else { p.vx *= (1 - accel * 0.35); if (Math.abs(p.vx) < 0.1) p.vx = 0; }
@@ -1761,14 +2241,14 @@ class ActionGame {
       if (isSkyActive && this.keys.jump && p.vy > 1.3) p.vy = 1.3;
 
       if (jumpPressed) {
-        const jumpPow = (p.form === 2 ? -8.2 : -7.6) - (this.puzzleStyle === 3 ? 0.45 : 0);
+        const jumpPow = (p.form === 2 ? -8.4 : -7.6) - (this.puzzleStyle === 3 ? 0.4 : 0);
         if (p.onGround) {
           p.vy = jumpPow;
           p.onGround = false;
-          p.jumpsLeft = p.form === 2 ? 1 : 0;
+          p.jumpsLeft = p.form === 2 ? 2 : 0;
           sfx.play('jump');
         } else if (isSkyActive && p.jumpsLeft > 0) {
-          p.vy = -7.8;
+          p.vy = -8.0;
           p.jumpsLeft--;
           sfx.play('jump');
           this.spawnBurst(p.x + p.w / 2, p.y + p.h, '#38bdf8', 8);
@@ -1786,15 +2266,22 @@ class ActionGame {
       for (let r = top; r <= bottom; r++) {
         for (let c = left; c <= right; c++) {
           if (r >= 0 && r < this.rows && c >= 0 && c < this.cols && this.grid[r][c] === 'R') {
-            for (let rr = 0; rr < this.rows; rr++) {
-              if (this.grid[rr][c] === 'R') {
-                this.grid[rr][c] = '.';
-                this.spawnBurst(c * this.TILE + 16, rr * this.TILE + 16, '#ff4d5a', 10);
-              }
+            // Destroy only the contiguous vertical segment of 'R'
+            let rr = r;
+            while (rr >= 0 && this.grid[rr][c] === 'R') {
+              this.grid[rr][c] = '.';
+              this.spawnBurst(c * this.TILE + 16, rr * this.TILE + 16, '#ff4d5a', 10);
+              rr--;
+            }
+            rr = r + 1;
+            while (rr < this.rows && this.grid[rr][c] === 'R') {
+              this.grid[rr][c] = '.';
+              this.spawnBurst(c * this.TILE + 16, rr * this.TILE + 16, '#ff4d5a', 10);
+              rr++;
             }
             this.shake = 7;
             this.score += 100;
-            this.updateHUD();
+            this.updateHUD(true);
             sfx.play('break');
           }
         }
@@ -1820,7 +2307,7 @@ class ActionGame {
           if (this.isPlatform(bottomRow, c)) {
             p.y = bottomRow * this.TILE - p.h;
             p.vy = 0; p.onGround = true; p.airSkyGrace = false;
-            p.jumpsLeft = p.form === 2 ? 1 : 0;
+            p.jumpsLeft = p.form === 2 ? 2 : 0;
             break;
           }
         }
@@ -1830,17 +2317,38 @@ class ActionGame {
       if (p.vy > 0) {
         p.y = Math.floor((p.y + p.h - 0.01) / this.TILE) * this.TILE - p.h - 0.01;
         p.vy = 0; p.onGround = true; p.airSkyGrace = false;
-        p.jumpsLeft = p.form === 2 ? 1 : 0;
+        p.jumpsLeft = p.form === 2 ? 2 : 0;
       } else if (p.vy < 0) {
         p.y = (Math.floor(p.y / this.TILE) + 1) * this.TILE + 0.01;
         p.vy = 0;
       }
     }
 
+    // スカイダイブの着地衝撃波: 着地時に近くの敵に1ダメージ
+    if (p.diveTimer > 0 && p.onGround) {
+      p.diveTimer = 0;
+      this.shake = 6;
+      sfx.play('break');
+      const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
+      this.spawnBurst(cx, cy, '#38bdf8', 20);
+      this.enemies.forEach(en => {
+        if (!en.dead && Math.hypot(en.x + en.w / 2 - cx, en.y + en.h / 2 - cy) < 78) {
+          this.hitEnemy(en, 1, '#38bdf8');
+        }
+      });
+    }
+
     this.blueSigns.forEach(bs => {
       if (p.hintCd <= 0 && p.form !== 2 && Math.abs(p.x - bs.x) < 42 && Math.abs(p.y - bs.y) < 48) {
         this.addFloatingText(p.x - 30, p.y - 16, '💧 青のウイング上昇で登ろう！', '#38bdf8');
         p.hintCd = 110;
+      }
+    });
+
+    this.secretSigns.forEach(ss => {
+      if (!ss.shown && Math.hypot(p.x + p.w / 2 - ss.x, p.y + p.h / 2 - ss.y) < 64) {
+        ss.shown = true;
+        this.addFloatingText(ss.x - 100, ss.y - 18, STAGES[this.stageIndex].secretHint, '#7dd3fc');
       }
     });
 
@@ -1873,7 +2381,7 @@ class ActionGame {
         p.hp = Math.min(p.maxHp, p.hp + 1);
         sfx.play('coin');
         this.addFloatingText(cp.x, cp.y - 14, 'CHECKPOINT! HP+1', '#4ade80');
-        this.updateHUD();
+        this.updateHUD(true);
       }
     });
 
@@ -1883,26 +2391,54 @@ class ActionGame {
         this.score += 30;
         sfx.play('coin');
         this.spawnBurst(cn.x, cn.y, '#fde047', 6);
-        this.updateHUD();
+        this.updateHUD(true);
+      }
+    });
+
+    // Rare Gems (Secret Route Reward)
+    this.gems.forEach(gm => {
+      if (!gm.taken && Math.hypot(p.x + p.w / 2 - gm.x, p.y + p.h / 2 - gm.y) < 24) {
+        gm.taken = true;
+        this.score += 200;
+        sfx.play('gem');
+        this.spawnBurst(gm.x, gm.y, '#38bdf8', 18);
+        this.addFloatingText(gm.x - 20, gm.y - 10, '💎 SECRET +200!', '#7dd3fc');
+        this.updateHUD(true);
+      }
+    });
+
+    // Heart Pickups (Secret Route Reward)
+    this.hearts.forEach(ht => {
+      if (!ht.taken && Math.hypot(p.x + p.w / 2 - ht.x, p.y + p.h / 2 - ht.y) < 24) {
+        ht.taken = true;
+        if (p.hp < p.maxHp) {
+          p.hp = Math.min(p.maxHp, p.hp + 2);
+          this.addFloatingText(ht.x - 16, ht.y - 10, '💖 HP +2!', '#f472b6');
+        } else {
+          this.score += 100;
+          this.addFloatingText(ht.x - 16, ht.y - 10, '💖 FULL +100!', '#f472b6');
+        }
+        sfx.play('gem');
+        this.spawnBurst(ht.x, ht.y, '#f472b6', 16);
+        this.updateHUD(true);
       }
     });
 
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const pr = this.projectiles[i];
-      pr.x += pr.vx; pr.life--;
+      pr.x += pr.vx; pr.y += (pr.vy || 0); pr.life--;
       let remove = pr.life <= 0 || this.collidesRect(pr.x, pr.y, pr.w, pr.h);
       this.targets.forEach(t => {
         if (!t.hit && Math.hypot(pr.x + 6 - t.x, pr.y + 2 - t.y) < 18) {
           t.hit = true; remove = true;
-          this.openNearestGroup(t.c, 'G', '#34d399', 'ゲート開放!');
+          this.openNearestGroup(t.c, 'G', '#34d399', 'ゲート開放!', t.r);
         }
       });
       this.enemies.forEach(en => {
         if (!en.dead && pr.x < en.x + en.w && pr.x + pr.w > en.x && pr.y < en.y + en.h && pr.y + pr.h > en.y) {
-          en.dead = true; remove = true; this.score += 100;
-          sfx.play('break');
-          this.spawnBurst(en.x + en.w / 2, en.y + en.h / 2, '#34d399', 12);
-          this.updateHUD();
+          if (this.hitEnemy(en, pr.dmg || 1, '#34d399')) {
+            remove = true;
+          }
         }
       });
       if (remove) this.projectiles.splice(i, 1);
@@ -1911,6 +2447,8 @@ class ActionGame {
     for (let i = this.enemies.length - 1; i >= 0; i--) {
       const en = this.enemies[i];
       if (en.dead) { this.enemies.splice(i, 1); continue; }
+      if (en.hitCd > 0) en.hitCd--;
+
       if (en.type === 'drone') {
         en.t += 0.06; en.x += en.vx; en.y = en.baseY + Math.sin(en.t) * 14;
         if (this.collidesRect(en.x, en.y, en.w, en.h)) en.vx *= -1;
@@ -1925,18 +2463,22 @@ class ActionGame {
 
       if (p.x < en.x + en.w && p.x + p.w > en.x && p.y < en.y + en.h && p.y + p.h > en.y) {
         if (p.dashTimer > 0) {
-          en.dead = true; this.score += 120; sfx.play('break');
-          this.spawnBurst(en.x + en.w / 2, en.y + en.h / 2, '#ff4d5a', 14);
-          this.updateHUD();
-        } else if (en.type !== 'knight' && p.vy > 0 && p.y + p.h - p.vy <= en.y + 10) {
-          en.dead = true; p.vy = -6.5; this.score += 80; sfx.play('jump');
-          this.spawnBurst(en.x + en.w / 2, en.y + en.h / 2, '#a3e635', 12);
-          this.updateHUD();
+          this.hitEnemy(en, 1, '#ff4d5a');
+        } else if (p.diveTimer > 0) {
+          // スカイダイブ中は触れた敵に1ダメージを与え、跳ね返る(被弾しない)
+          this.hitEnemy(en, 1, '#38bdf8');
+          p.vy = -7;
+          p.diveTimer = 0;
+        } else if (en.type !== 'knight' && en.type !== 'guardian' && p.vy > 0 && p.y + p.h - p.vy <= en.y + 10) {
+          this.hitEnemy(en, 1, '#a3e635');
+          p.vy = -6.5;
         } else {
           this.damagePlayer(1);
         }
       }
     }
+
+    this.checkEnemyGates();
 
     this.particles = this.particles.filter(pt => { pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.12; return --pt.life > 0; });
     this.afterimages = this.afterimages.filter(a => --a.life > 0);
@@ -1949,9 +2491,10 @@ class ActionGame {
   winStage() {
     this.running = false;
     this.stageCleared = true;
+    this.setPuzzlePaused(false);
     if (window.puzzles) puzzles.setActive(false);
     this.score += 500;
-    this.updateHUD();
+    this.updateHUD(true);
     sfx.play('win');
     const isLast = this.stageIndex === STAGES.length - 1;
     document.getElementById('overlayTitle').textContent = isLast ? '🎉 ALL STAGES CLEAR!' : '✨ STAGE CLEAR!';
@@ -2009,11 +2552,11 @@ class ActionGame {
           ctx.moveTo(x + 6, y + 6); ctx.lineTo(x + 16, y + 18); ctx.lineTo(x + 26, y + 10);
           ctx.moveTo(x + 16, y + 18); ctx.lineTo(x + 10, y + 27);
           ctx.stroke(); ctx.lineWidth = 1;
-          if (r === 8) { ctx.font = '14px sans-serif'; ctx.fillText('🔥', x + 7, y + 21); }
+          if (r === 8 || r === 2) { ctx.font = '14px sans-serif'; ctx.fillText('🔥', x + 7, y + 21); }
         } else if (ch === 'G') {
           ctx.fillStyle = 'rgba(16, 185, 129, 0.25)'; ctx.fillRect(x + 6, y, T - 12, T);
           ctx.fillStyle = '#34d399'; ctx.fillRect(x + 13, y, 6, T);
-          if (r === 8) { ctx.font = '14px sans-serif'; ctx.fillText('🍀', x + 7, y + 21); }
+          if (r === 8 || r === 2) { ctx.font = '14px sans-serif'; ctx.fillText('🍀', x + 7, y + 21); }
         } else if (ch === 'Y') {
           ctx.fillStyle = '#713f12'; ctx.fillRect(x + 4, y, T - 8, T);
           ctx.fillStyle = '#facc15';
@@ -2022,7 +2565,28 @@ class ActionGame {
           ctx.fillStyle = 'rgba(192, 132, 252, 0.25)'; ctx.fillRect(x + 6, y, T - 12, T);
           ctx.strokeStyle = '#c084fc'; ctx.setLineDash([4, 4]);
           ctx.strokeRect(x + 8, y + 1, T - 16, T - 2); ctx.setLineDash([]);
-          if (r === 8) { ctx.font = '14px sans-serif'; ctx.fillText('🌀', x + 7, y + 21); }
+          if (r === 8 || r === 2) { ctx.font = '14px sans-serif'; ctx.fillText('🌀', x + 7, y + 21); }
+        } else if (ch === 'M') {
+          ctx.fillStyle = 'rgba(249, 115, 22, 0.28)'; ctx.fillRect(x + 4, y, T - 8, T);
+          ctx.strokeStyle = '#fb923c'; ctx.lineWidth = 2;
+          ctx.strokeRect(x + 6, y + 1, T - 12, T - 2);
+          ctx.beginPath();
+          ctx.moveTo(x + 6, y); ctx.lineTo(x + T - 6, y + T);
+          ctx.moveTo(x + T - 6, y); ctx.lineTo(x + 6, y + T);
+          ctx.stroke(); ctx.lineWidth = 1;
+          if (r === 8) {
+            const g = this.enemyGates.find(gt => gt.col === c);
+            const rem = g ? g.enemies.filter(e => !e.dead).length : 0;
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(x + 1, y - 2, T - 2, 32);
+            ctx.strokeStyle = '#fb923c';
+            ctx.strokeRect(x + 1, y - 2, T - 2, 32);
+            ctx.font = '12px sans-serif';
+            ctx.fillText('⚔️', x + 8, y + 12);
+            ctx.fillStyle = '#fde047';
+            ctx.font = 'bold 11px sans-serif';
+            ctx.fillText(`残${rem}`, x + 6, y + 26);
+          }
         } else if (ch === 'S') {
           ctx.fillStyle = '#facc15';
           ctx.beginPath();
@@ -2055,6 +2619,18 @@ class ActionGame {
       ctx.fillText('💧', bs.x + 7, bs.y + 18);
     });
 
+    // Secret Route Signs
+    this.secretSigns.forEach(ss => {
+      const pulse = 0.55 + 0.45 * Math.sin(Date.now() * 0.007);
+      ctx.fillStyle = `rgba(125, 211, 252, ${pulse * 0.25})`;
+      ctx.beginPath(); ctx.arc(ss.x, ss.y, 15, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = `rgba(192, 132, 252, ${pulse})`;
+      ctx.stroke();
+      ctx.fillStyle = '#e0f2fe';
+      ctx.font = 'bold 10px sans-serif';
+      ctx.fillText('✨秘密', ss.x - 16, ss.y + 4);
+    });
+
     this.targets.forEach(t => {
       ctx.beginPath(); ctx.arc(t.x, t.y, 11, 0, Math.PI * 2);
       ctx.fillStyle = t.hit ? '#14532d' : '#34d399'; ctx.fill();
@@ -2084,12 +2660,38 @@ class ActionGame {
       ctx.strokeStyle = '#ca8a04'; ctx.stroke();
     });
 
+    // Rare Gems
+    this.gems.forEach(gm => {
+      if (gm.taken) return;
+      const gy = gm.y + bob;
+      ctx.fillStyle = '#38bdf8';
+      ctx.shadowColor = '#c084fc'; ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.moveTo(gm.x, gy - 10);
+      ctx.lineTo(gm.x + 9, gy);
+      ctx.lineTo(gm.x, gy + 10);
+      ctx.lineTo(gm.x - 9, gy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.strokeStyle = '#fff';
+      ctx.stroke();
+    });
+
+    // Heart Pickups
+    this.hearts.forEach(ht => {
+      if (ht.taken) return;
+      ctx.font = '16px sans-serif';
+      ctx.fillText('💖', ht.x - 8, ht.y + 5 + bob);
+    });
+
     this.afterimages.forEach(a => {
       ctx.fillStyle = a.color; ctx.globalAlpha = a.life / 16;
       ctx.fillRect(a.x, a.y, this.player.w, this.player.h); ctx.globalAlpha = 1;
     });
 
     this.enemies.forEach(en => {
+      if (en.hitCd % 4 >= 2) return;
       if (en.type === 'slime') {
         ctx.fillStyle = '#a3e635'; ctx.beginPath();
         ctx.roundRect(en.x, en.y + 6, en.w, en.h - 6, [10, 10, 3, 3]); ctx.fill();
@@ -2105,11 +2707,28 @@ class ActionGame {
         ctx.fillStyle = '#ec4899'; ctx.beginPath();
         ctx.arc(en.x + en.w / 2, en.y + en.h / 2, 11, 0, Math.PI * 2); ctx.fill();
         ctx.fillStyle = '#fff'; ctx.fillRect(en.x + 6, en.y + 8, 12, 4);
+      } else if (en.type === 'guardian') {
+        ctx.fillStyle = '#dc2626';
+        ctx.beginPath(); ctx.roundRect(en.x, en.y, en.w, en.h, 5); ctx.fill();
+        ctx.strokeStyle = '#fde047'; ctx.lineWidth = 2;
+        ctx.strokeRect(en.x + 1, en.y + 1, en.w - 2, en.h - 2); ctx.lineWidth = 1;
+        ctx.fillStyle = '#f8fafc'; ctx.beginPath();
+        ctx.moveTo(en.x + 4, en.y); ctx.lineTo(en.x + 9, en.y - 7); ctx.lineTo(en.x + 14, en.y);
+        ctx.moveTo(en.x + 18, en.y); ctx.lineTo(en.x + 23, en.y - 7); ctx.lineTo(en.x + 28, en.y);
+        ctx.fill();
+        ctx.fillStyle = '#fde047';
+        ctx.fillRect(en.x + 7, en.y + 11, 6, 5);
+        ctx.fillRect(en.x + 19, en.y + 11, 6, 5);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(en.x, en.y - 14, en.w, 5);
+        ctx.fillStyle = '#fb923c';
+        ctx.fillRect(en.x + 1, en.y - 13, (en.w - 2) * (en.hp / en.maxHp), 3);
       }
     });
 
     this.projectiles.forEach(pr => {
-      ctx.fillStyle = '#34d399'; ctx.shadowColor = '#34d399'; ctx.shadowBlur = 8;
+      ctx.fillStyle = '#34d399';
+      ctx.shadowColor = '#34d399'; ctx.shadowBlur = 8;
       ctx.fillRect(pr.x, pr.y, pr.w, pr.h); ctx.shadowBlur = 0;
     });
 
@@ -2118,7 +2737,7 @@ class ActionGame {
       const bodyColor = p.form === 0 ? '#cbd5e1' : COLORS[p.form - 1].color;
       if (p.zapTimer > 0) {
         ctx.strokeStyle = '#facc15'; ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.arc(p.x + p.w / 2, p.y + p.h / 2, 72 * (1 - p.zapTimer / 22) + 14, 0, Math.PI * 2);
+        ctx.beginPath(); ctx.arc(p.x + p.w / 2, p.y + p.h / 2, 86 * (1 - p.zapTimer / 22) + 14, 0, Math.PI * 2);
         ctx.stroke(); ctx.lineWidth = 1;
       }
 
