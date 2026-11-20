@@ -1,0 +1,2181 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PUZZLE SHIFT KNIGHT - 色別ギミック×5種パズル</title>
+<style>
+  :root {
+    --bg: #0c0f17;
+    --panel: #151b28;
+    --panel-light: #1e2738;
+    --border: #2c384f;
+    --text: #e6edf7;
+    --muted: #8b9bb4;
+    --c-0: #ff4d5a; /* 赤: ブレイカー */
+    --c-1: #38bdf8; /* 青: スカイ */
+    --c-2: #34d399; /* 緑: シューター */
+    --c-3: #facc15; /* 黄: エレキ */
+    --c-4: #c084fc; /* 紫: シャドウ */
+  }
+  * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    background: #10141f;
+    border-bottom: 1px solid var(--border);
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 800;
+    font-size: 1.05rem;
+  }
+  .brand .badge {
+    background: linear-gradient(135deg, #ff4d5a, #facc15, #38bdf8);
+    color: #0b0e14;
+    font-size: 0.7rem;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-weight: 900;
+  }
+  .header-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .btn-sm {
+    background: var(--panel-light);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 5px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.78rem;
+    font-weight: 600;
+    transition: all 0.14s;
+  }
+  .btn-sm:hover { background: #29354d; border-color: #4f648d; }
+  .btn-sm.active { background: #27406b; border-color: #38bdf8; color: #fff; }
+  .btn-sm:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Layout */
+  .main-grid {
+    flex: 1;
+    display: grid;
+    grid-template-columns: minmax(0, 1.42fr) minmax(350px, 1fr);
+    gap: 12px;
+    padding: 12px;
+    max-width: 1380px;
+    width: 100%;
+    margin: 0 auto;
+    align-items: start;
+  }
+  @media (max-width: 980px) {
+    .main-grid { grid-template-columns: 1fr; }
+  }
+
+  /* Left: Action Game */
+  .action-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  }
+  .hud-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    background: #0f131d;
+    padding: 7px 12px;
+    border-radius: 8px;
+    border: 1px solid #232c3f;
+    flex-wrap: wrap;
+  }
+  .hud-group {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .hearts { color: #ff4d5a; font-size: 1.05rem; letter-spacing: 2px; }
+  .stat-pill { font-size: 0.8rem; color: var(--muted); font-weight: 600; }
+  .stat-pill b { color: var(--text); font-size: 0.9rem; }
+  .form-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    border: 1px solid rgba(255,255,255,0.2);
+    background: #1b2333;
+  }
+
+  .canvas-wrap {
+    position: relative;
+    width: 100%;
+    background: #07090e;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid #263044;
+    aspect-ratio: 640 / 416;
+  }
+  canvas#gameCanvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .overlay-banner {
+    position: absolute;
+    inset: 0;
+    background: rgba(9, 12, 19, 0.84);
+    backdrop-filter: blur(4px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 20px;
+    gap: 12px;
+    z-index: 5;
+  }
+  .overlay-banner.hidden { display: none; }
+  .overlay-banner h2 { margin: 0; font-size: 1.6rem; }
+  .overlay-banner p { margin: 0; color: #cbd5e1; max-width: 490px; font-size: 0.87rem; line-height: 1.55; }
+  .btn-primary {
+    background: linear-gradient(135deg, #38bdf8, #6366f1);
+    color: #fff;
+    border: none;
+    padding: 11px 28px;
+    border-radius: 8px;
+    font-weight: 900;
+    font-size: 1rem;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    box-shadow: 0 4px 15px rgba(56, 189, 248, 0.35);
+    transition: transform 0.12s;
+  }
+  .btn-primary:hover { transform: translateY(-1px); }
+
+  /* 5 Color Action Slots */
+  .form-bar {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 6px;
+  }
+  .form-slot {
+    background: #101520;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 4px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.14s;
+    position: relative;
+    opacity: 0.48;
+  }
+  .form-slot.ready { opacity: 1; background: #161e2e; }
+  .form-slot.ready:hover { transform: translateY(-2px); border-color: #64748b; }
+  .form-slot.active {
+    border-width: 2px;
+    background: #1c273d;
+    box-shadow: 0 0 14px rgba(255,255,255,0.14);
+  }
+  .form-slot .key-num {
+    position: absolute;
+    top: 3px; left: 5px;
+    font-size: 0.65rem; color: var(--muted); font-weight: 700;
+  }
+  .form-slot .charge-badge {
+    position: absolute;
+    top: 3px; right: 5px;
+    font-size: 0.68rem;
+    font-weight: 900;
+    padding: 1px 5px;
+    border-radius: 999px;
+    background: #0b0f18;
+    border: 1px solid #334155;
+  }
+  .form-slot .f-icon { font-size: 1.15rem; margin-top: 2px; }
+  .form-slot .f-name { font-size: 0.72rem; font-weight: 800; margin-top: 1px; }
+  .form-slot .f-act { font-size: 0.63rem; color: var(--muted); }
+
+  .controls-hint {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.74rem;
+    color: var(--muted);
+    background: #0f131d;
+    padding: 6px 10px;
+    border-radius: 7px;
+    flex-wrap: wrap;
+  }
+  kbd {
+    background: #232c3f;
+    border: 1px solid #3b4863;
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-size: 0.7rem;
+    color: var(--text);
+    font-family: monospace;
+  }
+  .touch-controls { display: flex; gap: 5px; }
+  .touch-btn {
+    background: #232c3f; color: #fff; border: 1px solid #3c4b69;
+    border-radius: 6px; padding: 6px 11px; font-weight: 800; font-size: 0.78rem;
+    cursor: pointer; touch-action: none;
+  }
+
+  /* Right: 5 Puzzle Modes + Match-3 Board */
+  .puzzle-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+  }
+  .puzzle-tabs {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+  }
+  .p-tab {
+    background: #0f131d;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 7px 3px;
+    color: var(--muted);
+    cursor: pointer;
+    text-align: center;
+    font-size: 0.69rem;
+    font-weight: 700;
+    transition: all 0.14s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .p-tab:hover { background: #1a2132; color: var(--text); }
+  .p-tab.active {
+    background: #1d273c;
+    color: #fff;
+    border-color: #38bdf8;
+    box-shadow: inset 0 -3px 0 #38bdf8;
+  }
+
+  .puzzle-info {
+    background: #0f131d;
+    border: 1px solid #242e42;
+    border-radius: 8px;
+    padding: 8px 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+  }
+  .puzzle-info h3 { margin: 0 0 2px; font-size: 0.9rem; color: #7dd3fc; }
+  .puzzle-info p { margin: 0; font-size: 0.73rem; color: var(--muted); line-height: 1.35; }
+
+  .style-buff-bar {
+    background: #121a29;
+    border-left: 3px solid #38bdf8;
+    border-radius: 6px;
+    padding: 6px 9px;
+    font-size: 0.74rem;
+    color: #cbd5e1;
+  }
+
+  /* Match-3 Board Stage */
+  .board-stage {
+    position: relative;
+    background: #0b0f18;
+    border: 1px solid #253046;
+    border-radius: 10px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 318px;
+    overflow: hidden;
+  }
+  .puzzle-lock-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 11, 18, 0.86);
+    backdrop-filter: blur(5px);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 8px;
+    z-index: 15;
+    padding: 20px;
+  }
+  .puzzle-lock-overlay.hidden { display: none; }
+  .puzzle-lock-overlay .lock-icon { font-size: 2.2rem; }
+  .puzzle-lock-overlay .lock-title { font-weight: 800; font-size: 1rem; color: #e2e8f0; }
+  .puzzle-lock-overlay .lock-sub { font-size: 0.78rem; color: var(--muted); line-height: 1.45; }
+
+  .match-toast {
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(15, 23, 42, 0.94);
+    border: 1px solid #fff;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 800;
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.2s, top 0.2s;
+    white-space: nowrap;
+  }
+  .match-toast.show { opacity: 1; top: 12px; }
+
+  /* Grid & Gems */
+  .grid-container {
+    position: relative;
+    display: inline-block;
+  }
+  .gem-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 48px);
+    grid-template-rows: repeat(5, 48px);
+    gap: 5px;
+    position: relative;
+  }
+  .gem-cell {
+    width: 48px;
+    height: 48px;
+    border-radius: 9px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.3rem;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.12s, box-shadow 0.12s, filter 0.12s;
+    border: 2px solid rgba(255,255,255,0.22);
+    box-shadow: inset 0 2px 5px rgba(255,255,255,0.28), 0 3px 6px rgba(0,0,0,0.4);
+  }
+  .gem-cell:hover { transform: scale(1.05); }
+  .gem-cell.selected {
+    border-color: #fff;
+    box-shadow: 0 0 0 3px #fff, 0 0 14px #fff;
+    transform: scale(1.08);
+    z-index: 2;
+  }
+  .gem-cell.movable {
+    box-shadow: inset 0 0 0 2px #fff, 0 0 10px rgba(255,255,255,0.4);
+  }
+  .gem-cell.empty-slot {
+    background: #07090e !important;
+    border: 2px dashed #2e3b55 !important;
+    box-shadow: none !important;
+    cursor: default;
+  }
+  .gem-cell.popping {
+    transform: scale(1.22);
+    filter: brightness(1.7);
+    box-shadow: 0 0 18px #fff;
+  }
+  .gem-cell.invalid {
+    animation: shakeCell 0.25s;
+  }
+  @keyframes shakeCell {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-4px); }
+    75% { transform: translateX(4px); }
+  }
+
+  .gem-0 { background: linear-gradient(145deg, #ff6b76, #dc2626); }
+  .gem-1 { background: linear-gradient(145deg, #60cfff, #0284c7); }
+  .gem-2 { background: linear-gradient(145deg, #4ade80, #059669); }
+  .gem-3 { background: linear-gradient(145deg, #fde047, #ca8a04); color:#1e293b; }
+  .gem-4 { background: linear-gradient(145deg, #d8b4fe, #7e22ce); }
+
+  /* Rotate Mode Handles */
+  .rot-handles {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  .rot-btn {
+    position: absolute;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1.5px solid #e2e8f0;
+    color: #fff;
+    font-size: 0.72rem;
+    font-weight: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    pointer-events: auto;
+    transform: translate(-50%, -50%);
+    transition: transform 0.12s, background 0.12s;
+    z-index: 4;
+  }
+  .rot-btn:hover { background: #38bdf8; color: #0b0e14; transform: translate(-50%, -50%) scale(1.18); }
+
+  /* Shift Mode Frame */
+  .shift-layout {
+    display: grid;
+    grid-template-columns: 24px auto 24px;
+    grid-template-rows: 24px auto 24px;
+    gap: 4px;
+    align-items: center;
+    justify-items: center;
+  }
+  .shift-arrows-h {
+    display: grid;
+    grid-template-columns: repeat(5, 48px);
+    gap: 5px;
+  }
+  .shift-arrows-v {
+    display: grid;
+    grid-template-rows: repeat(5, 48px);
+    gap: 5px;
+  }
+  .arr-btn {
+    width: 22px;
+    height: 22px;
+    margin: auto;
+    border-radius: 5px;
+    border: 1px solid #3c4d6b;
+    background: #1b2436;
+    color: #cbd5e1;
+    font-size: 0.65rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+  }
+  .arr-btn:hover { background: #38bdf8; color: #090d16; border-color: #7dd3fc; }
+
+  .legend-box {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px 10px;
+    background: #0f131d;
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 0.71rem;
+    color: #cbd5e1;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <span>⚡ PUZZLE SHIFT KNIGHT</span>
+    <span class="badge">色専用ギミック × 3つ揃え5種パズル</span>
+  </div>
+  <div class="header-controls">
+    <button class="btn-sm active" id="btnStage1" onclick="game.loadStage(0); this.blur()">STAGE 1</button>
+    <button class="btn-sm" id="btnStage2" onclick="game.loadStage(1); this.blur()">STAGE 2</button>
+    <button class="btn-sm" id="btnStage3" onclick="game.loadStage(2); this.blur()">STAGE 3</button>
+    <button class="btn-sm" onclick="game.loadStage(game.stageIndex); this.blur()">↻ リトライ</button>
+    <button class="btn-sm active" id="btnSound" onclick="sfx.toggle(); this.blur()">🔊 SE ON</button>
+  </div>
+</header>
+
+<div class="main-grid">
+  <!-- LEFT: ACTION GAME -->
+  <section class="action-card">
+    <div class="hud-bar">
+      <div class="hud-group">
+        <div class="hearts" id="hudHearts">♥♥♥♥♥</div>
+        <div class="stat-pill">SCORE <b id="hudScore">0</b></div>
+        <div class="stat-pill" id="hudStageName">STAGE 1</div>
+      </div>
+      <div class="hud-group">
+        <div class="form-badge" id="hudStyleBadge">⚔️ 剣士スタイル</div>
+        <div class="form-badge" id="hudFormBadge">⚪ ノーマル</div>
+      </div>
+    </div>
+
+    <div class="canvas-wrap">
+      <canvas id="gameCanvas" width="640" height="416"></canvas>
+      <div class="overlay-banner" id="overlayBanner">
+        <h2 id="overlayTitle">PUZZLE SHIFT KNIGHT</h2>
+        <p id="overlayDesc"></p>
+        <button class="btn-primary" id="overlayBtn">▶ START</button>
+      </div>
+    </div>
+
+    <!-- 5 Color Action Slots -->
+    <div class="form-bar" id="formBar"></div>
+
+    <div class="controls-hint">
+      <div>
+        移動: <kbd>A</kbd><kbd>D</kbd>/<kbd>←</kbd><kbd>→</kbd> |
+        ジャンプ: <kbd>W</kbd>/<kbd>↑</kbd>/<kbd>Space</kbd> |
+        特殊アクション: <kbd>Z</kbd>/<kbd>J</kbd>/<kbd>Shift</kbd> |
+        色切替: <kbd>1</kbd>〜<kbd>5</kbd>
+      </div>
+      <div class="touch-controls">
+        <button class="touch-btn" data-key="left">◀</button>
+        <button class="touch-btn" data-key="right">▶</button>
+        <button class="touch-btn" data-key="jump">JUMP</button>
+        <button class="touch-btn" data-key="action" style="border-color:#38bdf8;">ACT</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- RIGHT: 5 DIFFERENT PUZZLES -->
+  <section class="puzzle-card">
+    <div class="puzzle-tabs" id="puzzleTabs"></div>
+
+    <div class="puzzle-info">
+      <div>
+        <h3 id="puzzleTitle">パズル名</h3>
+        <p id="puzzleDesc">説明</p>
+      </div>
+      <button class="btn-sm" id="btnReshuffle" onclick="puzzles.reshuffle(); this.blur()">🔄 盤面リセット</button>
+    </div>
+
+    <div class="style-buff-bar" id="styleBuffBar"></div>
+
+    <div class="board-stage">
+      <div class="puzzle-lock-overlay" id="puzzleLockOverlay">
+        <div class="lock-icon">🔒</div>
+        <div class="lock-title">パズル待機中</div>
+        <div class="lock-sub">左側の「<b>▶ START</b>」を押すとパズルが起動します</div>
+      </div>
+      <div class="match-toast" id="matchToast"></div>
+      <div id="puzzleBoard"></div>
+    </div>
+
+    <div class="legend-box">
+      <div><b style="color:#ff4d5a">🔥 赤×3</b>：赤ヒビ壁を突進破壊</div>
+      <div><b style="color:#38bdf8">💧 青×3</b>：青サイン(4マス高台)を大上昇</div>
+      <div><b style="color:#34d399">🍀 緑×3</b>：横穴の的を撃って緑ゲート開放</div>
+      <div><b style="color:#facc15">⚡ 黄×3</b>：電流床を歩き放電でシャッター開放</div>
+      <div style="grid-column:span 2"><b style="color:#c084fc">🌀 紫×3</b>：紫の位相バリアを瞬間ワープで通り抜け</div>
+    </div>
+  </section>
+</div>
+
+<script>
+/* =========================================================
+   1. SOUND ENGINE
+   ========================================================= */
+class SoundEngine {
+  constructor() { this.ctx = null; this.enabled = true; }
+  init() {
+    if (!this.ctx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (AC) this.ctx = new AC();
+    }
+    if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume();
+  }
+  toggle() {
+    this.enabled = !this.enabled;
+    const btn = document.getElementById('btnSound');
+    btn.textContent = this.enabled ? '🔊 SE ON' : '🔇 SE OFF';
+    btn.classList.toggle('active', this.enabled);
+  }
+  play(type, combo = 1) {
+    if (!this.enabled) return;
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.connect(gain); gain.connect(this.ctx.destination);
+
+    switch (type) {
+      case 'jump':
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(260, now);
+        osc.frequency.exponentialRampToValueAtTime(560, now + 0.11);
+        gain.gain.setValueAtTime(0.11, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.13);
+        osc.start(now); osc.stop(now + 0.13);
+        break;
+      case 'dash':
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, now);
+        osc.frequency.exponentialRampToValueAtTime(85, now + 0.18);
+        gain.gain.setValueAtTime(0.13, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+        osc.start(now); osc.stop(now + 0.19);
+        break;
+      case 'break':
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(140, now);
+        osc.frequency.exponentialRampToValueAtTime(45, now + 0.18);
+        gain.gain.setValueAtTime(0.16, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.19);
+        osc.start(now); osc.stop(now + 0.19);
+        break;
+      case 'shoot':
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(860, now);
+        osc.frequency.exponentialRampToValueAtTime(300, now + 0.1);
+        gain.gain.setValueAtTime(0.11, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+        osc.start(now); osc.stop(now + 0.11);
+        break;
+      case 'zap':
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(500, now);
+        osc.frequency.linearRampToValueAtTime(920, now + 0.08);
+        osc.frequency.linearRampToValueAtTime(320, now + 0.22);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.23);
+        osc.start(now); osc.stop(now + 0.23);
+        break;
+      case 'warp':
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(720, now);
+        osc.frequency.exponentialRampToValueAtTime(220, now + 0.08);
+        osc.frequency.exponentialRampToValueAtTime(980, now + 0.17);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+        osc.start(now); osc.stop(now + 0.18);
+        break;
+      case 'coin':
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, now);
+        osc.frequency.setValueAtTime(1320, now + 0.06);
+        gain.gain.setValueAtTime(0.09, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+        osc.start(now); osc.stop(now + 0.15);
+        break;
+      case 'hit':
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.linearRampToValueAtTime(70, now + 0.22);
+        gain.gain.setValueAtTime(0.17, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24);
+        osc.start(now); osc.stop(now + 0.24);
+        break;
+      case 'click':
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(500, now);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+        osc.start(now); osc.stop(now + 0.05);
+        break;
+      case 'match': {
+        const base = 440 * Math.pow(1.12, Math.min(combo - 1, 6));
+        [base, base * 1.25, base * 1.5].forEach((f, i) => {
+          const o = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          o.type = 'triangle';
+          o.connect(g); g.connect(this.ctx.destination);
+          o.frequency.setValueAtTime(f, now + i * 0.045);
+          g.gain.setValueAtTime(0.12, now + i * 0.045);
+          g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.045 + 0.18);
+          o.start(now + i * 0.045); o.stop(now + i * 0.045 + 0.19);
+        });
+        return;
+      }
+      case 'win':
+        [523, 659, 784, 1046].forEach((f, i) => {
+          const o = this.ctx.createOscillator();
+          const g = this.ctx.createGain();
+          o.type = 'sine';
+          o.connect(g); g.connect(this.ctx.destination);
+          o.frequency.setValueAtTime(f, now + i * 0.09);
+          g.gain.setValueAtTime(0.14, now + i * 0.09);
+          g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.09 + 0.34);
+          o.start(now + i * 0.09); o.stop(now + i * 0.09 + 0.35);
+        });
+        return;
+    }
+  }
+}
+const sfx = new SoundEngine();
+
+/* =========================================================
+   2. COLOR FORMS & 5 PUZZLE MODES DATA
+   ========================================================= */
+const COLORS = [
+  { id: 0, formId: 1, name: 'ブレイカー', icon: '🔥', color: '#ff4d5a', actionName: '突進ブレイク' },
+  { id: 1, formId: 2, name: 'スカイ',     icon: '💧', color: '#38bdf8', actionName: '大上昇ウイング' },
+  { id: 2, formId: 3, name: 'シューター', icon: '🍀', color: '#34d399', actionName: 'レーザー射撃' },
+  { id: 3, formId: 4, name: 'エレキ',     icon: '⚡', color: '#facc15', actionName: '放電バリア' },
+  { id: 4, formId: 5, name: 'シャドウ',   icon: '🌀', color: '#c084fc', actionName: '壁抜けワープ' }
+];
+
+const PUZZLE_MODES = {
+  1: {
+    id: 1, short: '入替', icon: '⇄',
+    title: '① スワップ・マッチ (隣接入替)',
+    desc: '隣り合う2マスを選んで入れ替え、同じ色を縦横に3つ揃えよう！',
+    styleName: '剣士スタイル',
+    styleBuff: 'スタイル効果: 3つ揃えた時の獲得アクション回数 +1ボーナス！'
+  },
+  2: {
+    id: 2, short: 'スライド', icon: '⊞',
+    title: '② スライド・マッチ (空きマス移動)',
+    desc: '黒い空きマスの上下左右をクリックしてスライド！同じ色を3つ揃えよう！',
+    styleName: '重装スタイル',
+    styleBuff: 'スタイル効果: ダメージ後の無敵時間が延長＆落下着地が素早い！'
+  },
+  3: {
+    id: 3, short: '2×2回転', icon: '↻',
+    title: '③ ギア・ローテート (4マス回転)',
+    desc: 'マスの間にある「↻」を押すと周囲4マスが時計回りに回転！3つ揃えよう！',
+    styleName: '空戦スタイル',
+    styleBuff: 'スタイル効果: 基本の空中制御が滑らか＆微ジャンプUP！'
+  },
+  4: {
+    id: 4, short: '行列シフト', icon: '⇕',
+    title: '④ ループ・シフト (行/列スライド)',
+    desc: '外枠の矢印を押すとその行・列が1マス循環シフト！同じ色を3つ揃えよう！',
+    styleName: '疾風スタイル',
+    styleBuff: 'スタイル効果: 基本の移動スピードがアップ！'
+  },
+  5: {
+    id: 5, short: '色変化', icon: '✦',
+    title: '⑤ カラーチェンジ (十字色送り)',
+    desc: 'マスを押すと自分と上下左右の色が変化(🔥→💧→🍀→⚡→🌀)。3つ揃えよう！',
+    styleName: '魔導スタイル',
+    styleBuff: 'スタイル効果: 特殊アクションのクールダウン短縮！'
+  }
+};
+
+/* =========================================================
+   3. 5-IN-1 MATCH-3 PUZZLE MANAGER
+   ========================================================= */
+class MatchPuzzleManager {
+  constructor() {
+    this.N = 5;
+    this.mode = 1;
+    this.active = false; // Locked until START is pressed!
+    this.boards = {};
+    this.selected = null;
+    this.busy = false;
+    this.poppingSet = new Set();
+
+    for (let m = 1; m <= 5; m++) {
+      this.boards[m] = this.createInitialBoard(m);
+    }
+    this.renderTabs();
+    this.selectMode(1, true);
+    this.setActive(false);
+  }
+
+  setActive(flag) {
+    this.active = flag;
+    const overlay = document.getElementById('puzzleLockOverlay');
+    const btnReset = document.getElementById('btnReshuffle');
+    if (overlay) overlay.classList.toggle('hidden', flag);
+    if (btnReset) btnReset.disabled = !flag;
+  }
+
+  resetAllBoards() {
+    this.selected = null;
+    this.busy = false;
+    this.poppingSet = new Set();
+    for (let m = 1; m <= 5; m++) {
+      this.boards[m] = this.createInitialBoard(m);
+    }
+    this.renderBoard();
+  }
+
+  createInitialBoard(mode) {
+    let b;
+    for (let attempt = 0; attempt < 80; attempt++) {
+      b = Array.from({ length: this.N }, () =>
+        Array.from({ length: this.N }, () => Math.floor(Math.random() * 5))
+      );
+      if (mode === 2) b[4][4] = -1;
+
+      for (let r = 0; r < this.N; r++) {
+        for (let c = 0; c < this.N; c++) {
+          if (b[r][c] < 0) continue;
+          while (
+            (c >= 2 && b[r][c - 1] === b[r][c] && b[r][c - 2] === b[r][c]) ||
+            (r >= 2 && b[r - 1][c] === b[r][c] && b[r - 2][c] === b[r][c])
+          ) {
+            b[r][c] = (b[r][c] + 1) % 5;
+          }
+        }
+      }
+      if (mode !== 1 || this.hasValidSwapMove(b)) break;
+    }
+    return b;
+  }
+
+  pickBalancedColor(b) {
+    const counts = [0, 0, 0, 0, 0];
+    for (let r = 0; r < this.N; r++)
+      for (let c = 0; c < this.N; c++)
+        if (b[r][c] >= 0) counts[b[r][c]]++;
+    const scarce = [];
+    for (let i = 0; i < 5; i++) if (counts[i] < 3) scarce.push(i);
+    if (scarce.length > 0 && Math.random() < 0.65) {
+      return scarce[Math.floor(Math.random() * scarce.length)];
+    }
+    return Math.floor(Math.random() * 5);
+  }
+
+  hasValidSwapMove(b) {
+    const test = (r1, c1, r2, c2) => {
+      [b[r1][c1], b[r2][c2]] = [b[r2][c2], b[r1][c1]];
+      const ok = this.findMatches(b).matchedCells.size > 0;
+      [b[r1][c1], b[r2][c2]] = [b[r2][c2], b[r1][c1]];
+      return ok;
+    };
+    for (let r = 0; r < this.N; r++) {
+      for (let c = 0; c < this.N; c++) {
+        if (c + 1 < this.N && test(r, c, r, c + 1)) return true;
+        if (r + 1 < this.N && test(r, c, r + 1, c)) return true;
+      }
+    }
+    return false;
+  }
+
+  findMatches(b) {
+    const matchedCells = new Set();
+    const colorCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+
+    for (let r = 0; r < this.N; r++) {
+      let c = 0;
+      while (c < this.N) {
+        const val = b[r][c];
+        if (val < 0) { c++; continue; }
+        let len = 1;
+        while (c + len < this.N && b[r][c + len] === val) len++;
+        if (len >= 3) for (let k = 0; k < len; k++) matchedCells.add(`${r},${c + k}`);
+        c += len;
+      }
+    }
+    for (let c = 0; c < this.N; c++) {
+      let r = 0;
+      while (r < this.N) {
+        const val = b[r][c];
+        if (val < 0) { r++; continue; }
+        let len = 1;
+        while (r + len < this.N && b[r + len][c] === val) len++;
+        if (len >= 3) for (let k = 0; k < len; k++) matchedCells.add(`${r + k},${c}`);
+        r += len;
+      }
+    }
+
+    matchedCells.forEach(key => {
+      const [r, c] = key.split(',').map(Number);
+      if (b[r][c] >= 0) colorCounts[b[r][c]]++;
+    });
+
+    return { matchedCells, colorCounts };
+  }
+
+  selectMode(modeId, silent = false) {
+    if (this.busy) return;
+    this.mode = modeId;
+    this.selected = null;
+    const pm = PUZZLE_MODES[modeId];
+    document.getElementById('puzzleTitle').textContent = pm.title;
+    document.getElementById('puzzleDesc').textContent = pm.desc;
+    document.getElementById('styleBuffBar').innerHTML = `<b>${pm.styleName}</b> — ${pm.styleBuff}`;
+    this.renderTabs();
+    this.renderBoard();
+    if (window.game && this.active) game.onPuzzleStyleChanged(modeId);
+    if (!silent) sfx.play('click');
+  }
+
+  reshuffle() {
+    if (!this.active || this.busy) return;
+    this.selected = null;
+    this.boards[this.mode] = this.createInitialBoard(this.mode);
+    sfx.play('click');
+    this.renderBoard();
+  }
+
+  renderTabs() {
+    const wrap = document.getElementById('puzzleTabs');
+    wrap.innerHTML = '';
+    for (let m = 1; m <= 5; m++) {
+      const pm = PUZZLE_MODES[m];
+      const btn = document.createElement('button');
+      btn.className = 'p-tab' + (this.mode === m ? ' active' : '');
+      btn.innerHTML = `<span style="font-size:1.05rem">${pm.icon}</span><span>${pm.short}</span>`;
+      btn.onclick = () => { this.selectMode(m); btn.blur(); };
+      wrap.appendChild(btn);
+    }
+  }
+
+  showToast(text, color = '#fff') {
+    const el = document.getElementById('matchToast');
+    el.textContent = text;
+    el.style.color = color;
+    el.style.borderColor = color;
+    el.classList.add('show');
+    clearTimeout(this.toastTimer);
+    this.toastTimer = setTimeout(() => el.classList.remove('show'), 1450);
+  }
+
+  resolveMatches(combo = 1) {
+    if (!this.active) { this.busy = false; return; }
+    const b = this.boards[this.mode];
+    const { matchedCells, colorCounts } = this.findMatches(b);
+    if (matchedCells.size === 0) {
+      this.busy = false;
+      if (this.mode === 1 && !this.hasValidSwapMove(b)) {
+        this.boards[1] = this.createInitialBoard(1);
+        this.showToast('手詰まりのため盤面シャッフル！', '#94a3b8');
+      }
+      this.renderBoard();
+      return;
+    }
+
+    this.busy = true;
+    this.poppingSet = matchedCells;
+    sfx.play('match', combo);
+    this.renderBoard();
+
+    const styleBonus = this.mode === 1 ? 1 : 0;
+    const msgs = [];
+    for (let col = 0; col < 5; col++) {
+      const cnt = colorCounts[col];
+      if (cnt >= 3) {
+        const gain = cnt + styleBonus + (combo > 1 ? combo - 1 : 0);
+        const cInfo = COLORS[col];
+        game.grantColorCharge(cInfo.formId, gain);
+        msgs.push(`${cInfo.icon}${cInfo.name}+${gain}`);
+      }
+    }
+    if (msgs.length) {
+      const firstCol = Object.keys(colorCounts).find(k => colorCounts[k] >= 3);
+      const toastText = (combo > 1 ? `${combo}連鎖! ` : '') + msgs.join(' / ') + ' アクション可能！';
+      this.showToast(toastText, COLORS[firstCol || 0].color);
+    }
+
+    setTimeout(() => {
+      if (!this.active) { this.busy = false; this.poppingSet = new Set(); return; }
+      matchedCells.forEach(key => {
+        const [r, c] = key.split(',').map(Number);
+        b[r][c] = -2;
+      });
+      this.poppingSet = new Set();
+
+      for (let c = 0; c < this.N; c++) {
+        const colVals = [];
+        for (let r = this.N - 1; r >= 0; r--) {
+          if (b[r][c] !== -2) colVals.push(b[r][c]);
+        }
+        while (colVals.length < this.N) {
+          colVals.push(this.pickBalancedColor(b));
+        }
+        for (let r = this.N - 1; r >= 0; r--) {
+          b[r][c] = colVals[this.N - 1 - r];
+        }
+      }
+
+      this.renderBoard();
+      setTimeout(() => this.resolveMatches(combo + 1), 160);
+    }, 230);
+  }
+
+  handleCellClick(r, c) {
+    if (!this.active || this.busy) return;
+    const b = this.boards[this.mode];
+
+    if (this.mode === 1) {
+      if (!this.selected) {
+        this.selected = [r, c];
+        sfx.play('click');
+        this.renderBoard();
+        return;
+      }
+      const [sr, sc] = this.selected;
+      if (sr === r && sc === c) {
+        this.selected = null;
+        this.renderBoard();
+        return;
+      }
+      if (Math.abs(sr - r) + Math.abs(sc - c) === 1) {
+        [b[sr][sc], b[r][c]] = [b[r][c], b[sr][sc]];
+        if (this.findMatches(b).matchedCells.size > 0) {
+          this.selected = null;
+          this.resolveMatches(1);
+        } else {
+          [b[sr][sc], b[r][c]] = [b[r][c], b[sr][sc]];
+          this.selected = null;
+          sfx.play('hit');
+          this.renderBoard();
+          const cells = document.querySelectorAll('.gem-cell');
+          if (cells[r * 5 + c]) cells[r * 5 + c].classList.add('invalid');
+        }
+      } else {
+        this.selected = [r, c];
+        sfx.play('click');
+        this.renderBoard();
+      }
+    } else if (this.mode === 2) {
+      if (b[r][c] < 0) return;
+      let er = -1, ec = -1;
+      for (let rr = 0; rr < this.N; rr++)
+        for (let cc = 0; cc < this.N; cc++)
+          if (b[rr][cc] === -1) { er = rr; ec = cc; }
+      if (Math.abs(r - er) + Math.abs(c - ec) === 1) {
+        b[er][ec] = b[r][c];
+        b[r][c] = -1;
+        sfx.play('click');
+        this.resolveMatches(1);
+      }
+    } else if (this.mode === 5) {
+      [[0,0],[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr, dc]) => {
+        const nr = r + dr, nc = c + dc;
+        if (nr >= 0 && nr < this.N && nc >= 0 && nc < this.N && b[nr][nc] >= 0) {
+          b[nr][nc] = (b[nr][nc] + 1) % 5;
+        }
+      });
+      sfx.play('click');
+      this.resolveMatches(1);
+    }
+  }
+
+  handleRotate2x2(r, c) {
+    if (!this.active || this.busy) return;
+    const b = this.boards[3];
+    const tmp = b[r][c];
+    b[r][c] = b[r + 1][c];
+    b[r + 1][c] = b[r + 1][c + 1];
+    b[r + 1][c + 1] = b[r][c + 1];
+    b[r][c + 1] = tmp;
+    sfx.play('click');
+    this.resolveMatches(1);
+  }
+
+  handleShift(type, idx, dir) {
+    if (!this.active || this.busy) return;
+    const b = this.boards[4];
+    if (type === 'row') {
+      const row = b[idx];
+      if (dir > 0) row.unshift(row.pop());
+      else row.push(row.shift());
+    } else {
+      if (dir > 0) {
+        const last = b[this.N - 1][idx];
+        for (let r = this.N - 1; r > 0; r--) b[r][idx] = b[r - 1][idx];
+        b[0][idx] = last;
+      } else {
+        const first = b[0][idx];
+        for (let r = 0; r < this.N - 1; r++) b[r][idx] = b[r + 1][idx];
+        b[this.N - 1][idx] = first;
+      }
+    }
+    sfx.play('click');
+    this.resolveMatches(1);
+  }
+
+  renderBoard() {
+    const container = document.getElementById('puzzleBoard');
+    container.innerHTML = '';
+    const b = this.boards[this.mode];
+
+    let er = -1, ec = -1;
+    if (this.mode === 2) {
+      for (let r = 0; r < this.N; r++)
+        for (let c = 0; c < this.N; c++)
+          if (b[r][c] === -1) { er = r; ec = c; }
+    }
+
+    const buildGrid = () => {
+      const wrap = document.createElement('div');
+      wrap.className = 'grid-container';
+      const grid = document.createElement('div');
+      grid.className = 'gem-grid';
+
+      for (let r = 0; r < this.N; r++) {
+        for (let c = 0; c < this.N; c++) {
+          const val = b[r][c];
+          const cell = document.createElement('div');
+          if (val === -1) {
+            cell.className = 'gem-cell empty-slot';
+          } else {
+            const isSel = this.selected && this.selected[0] === r && this.selected[1] === c;
+            const isMov = this.mode === 2 && Math.abs(r - er) + Math.abs(c - ec) === 1;
+            const isPop = this.poppingSet.has(`${r},${c}`);
+            cell.className = `gem-cell gem-${val}`
+              + (isSel ? ' selected' : '')
+              + (isMov ? ' movable' : '')
+              + (isPop ? ' popping' : '');
+            cell.textContent = COLORS[val].icon;
+            cell.onclick = () => this.handleCellClick(r, c);
+          }
+          grid.appendChild(cell);
+        }
+      }
+      wrap.appendChild(grid);
+
+      if (this.mode === 3) {
+        const handles = document.createElement('div');
+        handles.className = 'rot-handles';
+        for (let r = 0; r < this.N - 1; r++) {
+          for (let c = 0; c < this.N - 1; c++) {
+            const btn = document.createElement('button');
+            btn.className = 'rot-btn';
+            btn.textContent = '↻';
+            btn.style.left = `${(c + 1) * 48 + c * 5 + 2.5}px`;
+            btn.style.top = `${(r + 1) * 48 + r * 5 + 2.5}px`;
+            btn.onclick = (e) => { e.stopPropagation(); this.handleRotate2x2(r, c); btn.blur(); };
+            handles.appendChild(btn);
+          }
+        }
+        wrap.appendChild(handles);
+      }
+      return wrap;
+    };
+
+    if (this.mode === 4) {
+      const layout = document.createElement('div');
+      layout.className = 'shift-layout';
+
+      layout.appendChild(document.createElement('div'));
+      const topArr = document.createElement('div');
+      topArr.className = 'shift-arrows-h';
+      for (let c = 0; c < 5; c++) {
+        const bUp = document.createElement('button');
+        bUp.className = 'arr-btn'; bUp.textContent = '▲';
+        bUp.onclick = () => { this.handleShift('col', c, -1); bUp.blur(); };
+        topArr.appendChild(bUp);
+      }
+      layout.appendChild(topArr);
+      layout.appendChild(document.createElement('div'));
+
+      const leftArr = document.createElement('div');
+      leftArr.className = 'shift-arrows-v';
+      for (let r = 0; r < 5; r++) {
+        const bL = document.createElement('button');
+        bL.className = 'arr-btn'; bL.textContent = '◀';
+        bL.onclick = () => { this.handleShift('row', r, -1); bL.blur(); };
+        leftArr.appendChild(bL);
+      }
+      layout.appendChild(leftArr);
+
+      layout.appendChild(buildGrid());
+
+      const rightArr = document.createElement('div');
+      rightArr.className = 'shift-arrows-v';
+      for (let r = 0; r < 5; r++) {
+        const bR = document.createElement('button');
+        bR.className = 'arr-btn'; bR.textContent = '▶';
+        bR.onclick = () => { this.handleShift('row', r, 1); bR.blur(); };
+        rightArr.appendChild(bR);
+      }
+      layout.appendChild(rightArr);
+
+      layout.appendChild(document.createElement('div'));
+      const botArr = document.createElement('div');
+      botArr.className = 'shift-arrows-h';
+      for (let c = 0; c < 5; c++) {
+        const bDn = document.createElement('button');
+        bDn.className = 'arr-btn'; bDn.textContent = '▼';
+        bDn.onclick = () => { this.handleShift('col', c, 1); bDn.blur(); };
+        botArr.appendChild(bDn);
+      }
+      layout.appendChild(botArr);
+      layout.appendChild(document.createElement('div'));
+
+      container.appendChild(layout);
+    } else {
+      container.appendChild(buildGrid());
+    }
+  }
+}
+
+/* =========================================================
+   4. STAGE MAPS - STRICT COLOR-LOCKED GIMMICKS
+   ========================================================= */
+const STAGES = [
+  {
+    name: 'STAGE 1: 5色の試練',
+    map: [
+      '##########################################################################',
+      '#            R                       G                           P       #',
+      '#            R                       G                           P       #',
+      '#            R            ###        G                           P       #',
+      '#            R             T#        G                           P       #',
+      '#            R            ###        G                           P       #',
+      '#            R       B  #####        G                           P       #',
+      '#      o     R      ########         G                           P       #',
+      '#     ===    R      #                G   ####################### P       #',
+      '#            R      #       E        G   #                       P  o    #',
+      '#  @         R  o   #   o   =        G   #          C  Y         P === X #',
+      '################B####################G####SSSSSS#######Y##################',
+      '##########################################################################'
+    ]
+  },
+  {
+    name: 'STAGE 2: 天空の要塞',
+    map: [
+      '################################################################################',
+      '#                     G         R                           P                  #',
+      '#                     G         R                           P                  #',
+      '#              ###    G         R                           P           B   X  #',
+      '#               T#    G         R                           P          #########',
+      '#              ###    G         R                           P          #       #',
+      '#      B   o          G   o     R                           P   o      #       #',
+      '#     #######    =    G  ===    R   H     ################# P  ===     #       #',
+      '#     #               G         R         #                 P          #       #',
+      '#     #     K         G         R         #          C  Y   P     K    #       #',
+      '#  @  #   #####   =   G         R    E    #          #  Y   P   #####  #       #',
+      '#######B##############G#########R##########SSSSSS#####  Y###P###########B#######',
+      '################################################################################'
+    ]
+  },
+  {
+    name: 'STAGE 3: 終焉のコア',
+    map: [
+      '######################################################################################',
+      '#            R           P                     G                        R     P      #',
+      '#            R           P              ###    G                        R     P      #',
+      '#            R           P               T#    G                        R     P      #',
+      '#            R           P              ###    G                        R     P      #',
+      '#            R           P      B  o           G                        R     P      #',
+      '#            R           P     ######    =     G                        R     P      #',
+      '#     o      R     F     P     #               G   ###################  R     P   X  #',
+      '#    ===     R           P     #     K         G   #                 #  R     P  ### #',
+      '#            R     E     P     #   #####       G   #          C  Y   #  R     P      #',
+      '#  @         R    ###    P  o  #           H   G   #          #  Y   #  R     P  o   #',
+      '#############R###########P######B##############G####SSSSSS#####  Y###R##R#####P#######',
+      '######################################################################################'
+    ]
+  }
+];
+
+/* =========================================================
+   5. ACTION GAME ENGINE
+   ========================================================= */
+class ActionGame {
+  constructor() {
+    this.canvas = document.getElementById('gameCanvas');
+    this.ctx = this.canvas.getContext('2d');
+    this.TILE = 32;
+    this.stageIndex = 0;
+    this.score = 0;
+    this.running = false;
+    this.puzzleStyle = 1;
+    this.keys = { left: false, right: false, jump: false, action: false };
+    this.prevKeys = { jump: false, action: false };
+
+    this.particles = [];
+    this.projectiles = [];
+    this.afterimages = [];
+    this.floatingTexts = [];
+    this.shake = 0;
+
+    this.bindInputs();
+    this.loadStage(0, true);
+    requestAnimationFrame(() => this.loop());
+  }
+
+  bindInputs() {
+    window.addEventListener('keydown', (e) => {
+      if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'].includes(e.code)) {
+        e.preventDefault();
+      }
+      sfx.init();
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keys.left = true;
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keys.right = true;
+      if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') this.keys.jump = true;
+      if (e.code === 'KeyZ' || e.code === 'KeyJ' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.keys.action = true;
+
+      if (this.running && e.code >= 'Digit1' && e.code <= 'Digit5') {
+        this.switchForm(Number(e.code.replace('Digit', '')));
+      }
+    });
+    window.addEventListener('keyup', (e) => {
+      if (e.code === 'ArrowLeft' || e.code === 'KeyA') this.keys.left = false;
+      if (e.code === 'ArrowRight' || e.code === 'KeyD') this.keys.right = false;
+      if (e.code === 'ArrowUp' || e.code === 'KeyW' || e.code === 'Space') this.keys.jump = false;
+      if (e.code === 'KeyZ' || e.code === 'KeyJ' || e.code === 'ShiftLeft' || e.code === 'ShiftRight') this.keys.action = false;
+    });
+
+    document.querySelectorAll('.touch-btn').forEach(btn => {
+      const k = btn.dataset.key;
+      const down = (e) => { e.preventDefault(); sfx.init(); this.keys[k] = true; };
+      const up = (e) => { e.preventDefault(); this.keys[k] = false; };
+      btn.addEventListener('pointerdown', down);
+      btn.addEventListener('pointerup', up);
+      btn.addEventListener('pointerleave', up);
+      btn.addEventListener('pointercancel', up);
+    });
+
+    document.getElementById('overlayBtn').onclick = () => {
+      sfx.init();
+      document.getElementById('overlayBanner').classList.add('hidden');
+      if (this.stageCleared) {
+        this.loadStage((this.stageIndex + 1) % STAGES.length, false);
+      } else if (this.gameOver) {
+        this.loadStage(this.stageIndex, false);
+      }
+      this.running = true;
+      if (window.puzzles) puzzles.setActive(true);
+    };
+  }
+
+  loadStage(idx, showTitle = false) {
+    this.stageIndex = idx;
+    this.stageCleared = false;
+    this.gameOver = false;
+    [1, 2, 3].forEach(n => document.getElementById('btnStage' + n).classList.toggle('active', idx === n - 1));
+
+    const data = STAGES[idx];
+    document.getElementById('hudStageName').textContent = data.name;
+
+    this.rows = data.map.length;
+    this.cols = data.map[0].length;
+    this.grid = Array.from({ length: this.rows }, () => Array(this.cols).fill('.'));
+    this.enemies = [];
+    this.coins = [];
+    this.targets = [];
+    this.coils = [];
+    this.checkpoints = [];
+    this.blueSigns = [];
+    this.particles = [];
+    this.projectiles = [];
+    this.afterimages = [];
+    this.floatingTexts = [];
+
+    let startX = 64, startY = 250;
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        const ch = data.map[r][c];
+        const wx = c * this.TILE, wy = r * this.TILE;
+        if (ch === '@') { startX = wx + 4; startY = wy + 4; }
+        else if (ch === 'o') this.coins.push({ x: wx + 16, y: wy + 16, taken: false });
+        else if (ch === 'H') this.checkpoints.push({ x: wx, y: wy, active: false });
+        else if (ch === 'B') {
+          this.blueSigns.push({ x: wx, y: wy });
+          this.grid[r][c] = (r === this.rows - 2) ? '#' : '.';
+        }
+        else if (ch === 'T') { this.targets.push({ r, c, x: wx + 16, y: wy + 16, hit: false }); this.grid[r][c] = 'T'; }
+        else if (ch === 'C') { this.coils.push({ r, c, x: wx + 16, y: wy + 16, active: false }); this.grid[r][c] = 'C'; }
+        else if (ch === 'E') this.enemies.push({ type: 'slime', x: wx + 4, y: wy + 8, w: 24, h: 24, vx: 1.1, hp: 1 });
+        else if (ch === 'K') this.enemies.push({ type: 'knight', x: wx + 3, y: wy + 4, w: 26, h: 28, vx: -0.9, hp: 1 });
+        else if (ch === 'F') this.enemies.push({ type: 'drone', x: wx + 4, y: wy + 4, baseY: wy + 4, w: 24, h: 22, vx: 1.3, t: Math.random() * 6, hp: 1 });
+        else if (ch !== ' ') this.grid[r][c] = ch;
+      }
+    }
+
+    this.player = {
+      x: startX, y: startY,
+      spawnX: startX, spawnY: startY,
+      w: 22, h: 26,
+      vx: 0, vy: 0,
+      dir: 1,
+      onGround: false,
+      jumpsLeft: 0,
+      airSkyGrace: false,
+      hp: 5, maxHp: 5,
+      invuln: 0,
+      form: 0,
+      charges: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      actionCd: 0,
+      dashTimer: 0,
+      zapTimer: 0,
+      hintCd: 0
+    };
+
+    this.cameraX = 0;
+    this.renderFormBar();
+    this.updateHUD();
+
+    if (showTitle) {
+      this.running = false;
+      if (window.puzzles) puzzles.setActive(false);
+      document.getElementById('overlayTitle').textContent = 'PUZZLE SHIFT KNIGHT';
+      document.getElementById('overlayDesc').innerHTML =
+        'ステージのギミックは<b>対応する色の能力でないと突破できません！</b><br>' +
+        '<b>START</b>を押して右側の<b>5種類のパズル</b>を起動し、同じ色を縦横に3つ揃えて変身しよう！';
+      document.getElementById('overlayBtn').textContent = '▶ START';
+      document.getElementById('overlayBanner').classList.remove('hidden');
+    } else {
+      this.running = true;
+      if (window.puzzles) {
+        puzzles.resetAllBoards();
+        puzzles.setActive(true);
+      }
+      document.getElementById('overlayBanner').classList.add('hidden');
+    }
+  }
+
+  onPuzzleStyleChanged(modeId) {
+    this.puzzleStyle = modeId;
+    if (this.player) {
+      const pm = PUZZLE_MODES[modeId];
+      this.addFloatingText(this.player.x, this.player.y - 16, `${pm.styleName}に変更!`, '#7dd3fc');
+    }
+    this.updateHUD();
+  }
+
+  // Note: Solving puzzles grants action charges ONLY (no score added)
+  grantColorCharge(formId, amount) {
+    const p = this.player;
+    p.charges[formId] = Math.min(99, p.charges[formId] + amount);
+
+    p.form = formId;
+    if (formId === 2 && !p.onGround) p.jumpsLeft = Math.max(p.jumpsLeft, 1);
+
+    const cInfo = COLORS[formId - 1];
+    this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, cInfo.color, 18);
+    this.addFloatingText(p.x, p.y - 14, `${cInfo.icon}${cInfo.name} +${amount}!`, cInfo.color);
+    this.renderFormBar();
+    this.updateHUD();
+  }
+
+  switchForm(formId) {
+    if (!this.running) return;
+    const p = this.player;
+    if (p.charges[formId] <= 0) {
+      const cInfo = COLORS[formId - 1];
+      this.addFloatingText(p.x, p.y - 10, `${cInfo.icon}を3つ揃えてチャージしよう!`, cInfo.color);
+      return;
+    }
+    p.form = formId;
+    if (formId === 2 && !p.onGround) p.jumpsLeft = Math.max(p.jumpsLeft, 1);
+    sfx.play('click');
+    this.renderFormBar();
+    this.updateHUD();
+  }
+
+  consumeCharge(formId) {
+    const p = this.player;
+    p.charges[formId] = Math.max(0, p.charges[formId] - 1);
+    if (p.charges[formId] === 0 && p.form === formId) {
+      if (formId === 2 && !p.onGround) p.airSkyGrace = true;
+      const next = [1, 2, 3, 4, 5].find(id => p.charges[id] > 0) || 0;
+      p.form = next;
+    }
+    this.renderFormBar();
+    this.updateHUD();
+  }
+
+  renderFormBar() {
+    const bar = document.getElementById('formBar');
+    bar.innerHTML = '';
+    COLORS.forEach((cInfo) => {
+      const fid = cInfo.formId;
+      const chg = this.player.charges[fid];
+      const ready = chg > 0;
+      const active = this.player.form === fid;
+      const slot = document.createElement('div');
+      slot.className = 'form-slot' + (ready ? ' ready' : '') + (active ? ' active' : '');
+      if (active) slot.style.borderColor = cInfo.color;
+      slot.innerHTML = `
+        <span class="key-num">${fid}</span>
+        <span class="charge-badge" style="color:${ready ? cInfo.color : '#64748b'}">${ready ? '×' + chg : '🔒0'}</span>
+        <div class="f-icon">${cInfo.icon}</div>
+        <div class="f-name" style="color:${ready ? cInfo.color : '#64748b'}">${cInfo.name}</div>
+        <div class="f-act">${cInfo.actionName}</div>
+      `;
+      slot.onclick = () => this.switchForm(fid);
+      bar.appendChild(slot);
+    });
+  }
+
+  updateHUD() {
+    const p = this.player;
+    document.getElementById('hudHearts').textContent = '♥'.repeat(Math.max(0, p.hp)) + '♡'.repeat(Math.max(0, p.maxHp - p.hp));
+    document.getElementById('hudScore').textContent = this.score;
+
+    const pm = PUZZLE_MODES[this.puzzleStyle];
+    document.getElementById('hudStyleBadge').textContent = `${pm.icon} ${pm.styleName}`;
+
+    const badge = document.getElementById('hudFormBadge');
+    if (p.form === 0) {
+      badge.textContent = '⚪ ノーマル (3つ揃えて変身)';
+      badge.style.borderColor = '#64748b';
+      badge.style.color = '#cbd5e1';
+    } else {
+      const cInfo = COLORS[p.form - 1];
+      badge.textContent = `${cInfo.icon} ${cInfo.name} (残 ${p.charges[p.form]})`;
+      badge.style.borderColor = cInfo.color;
+      badge.style.color = cInfo.color;
+    }
+  }
+
+  addFloatingText(x, y, text, color = '#fff') {
+    this.floatingTexts.push({ x, y, text, color, life: 70 });
+  }
+
+  spawnBurst(x, y, color, count = 14) {
+    for (let i = 0; i < count; i++) {
+      const ang = Math.random() * Math.PI * 2;
+      const spd = 1 + Math.random() * 4;
+      this.particles.push({
+        x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 1,
+        size: 2 + Math.random() * 3.5, color, life: 20 + Math.random() * 20
+      });
+    }
+  }
+
+  isSolid(r, c, ignorePhase = false) {
+    if (r < 0 || r >= this.rows || c < 0 || c >= this.cols) return true;
+    const ch = this.grid[r][c];
+    if (ch === 'P' && ignorePhase) return false;
+    return ['#', 'R', 'G', 'Y', 'P'].includes(ch);
+  }
+
+  isPlatform(r, c) {
+    if (r < 0 || r >= this.rows || c < 0 || c >= this.cols) return false;
+    return this.grid[r][c] === '=';
+  }
+
+  triggerSpecialAction() {
+    const p = this.player;
+    if (p.actionCd > 0) return;
+
+    if (p.form === 0 || p.charges[p.form] <= 0) {
+      sfx.play('hit');
+      this.addFloatingText(p.x - 20, p.y - 10, '右のパズルで3つ揃えると使用可能!', '#fca5a5');
+      p.actionCd = 20;
+      return;
+    }
+
+    const cdScale = this.puzzleStyle === 5 ? 0.55 : 1.0;
+
+    if (p.form === 1) {
+      p.dashTimer = 16;
+      p.actionCd = Math.round(24 * cdScale);
+      p.vy = 0;
+      sfx.play('dash');
+      this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#ff4d5a', 12);
+      this.consumeCharge(1);
+    } else if (p.form === 2) {
+      p.vy = -11.2;
+      p.onGround = false;
+      p.airSkyGrace = true;
+      p.actionCd = Math.round(28 * cdScale);
+      sfx.play('jump');
+      this.spawnBurst(p.x + p.w / 2, p.y + p.h, '#38bdf8', 14);
+      this.consumeCharge(2);
+    } else if (p.form === 3) {
+      this.projectiles.push({
+        x: p.dir > 0 ? p.x + p.w : p.x - 10,
+        y: p.y + 10,
+        vx: p.dir * 9.5,
+        w: 12, h: 5, life: 60
+      });
+      p.actionCd = Math.round(14 * cdScale);
+      sfx.play('shoot');
+      this.consumeCharge(3);
+    } else if (p.form === 4) {
+      p.zapTimer = 18;
+      p.actionCd = Math.round(26 * cdScale);
+      sfx.play('zap');
+      this.shake = 5;
+      const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
+      this.spawnBurst(cx, cy, '#facc15', 20);
+      this.enemies.forEach(en => {
+        if (Math.hypot(en.x + en.w / 2 - cx, en.y + en.h / 2 - cy) < 84) {
+          en.dead = true;
+          this.score += 100;
+          this.spawnBurst(en.x + en.w / 2, en.y + en.h / 2, '#facc15', 14);
+        }
+      });
+      this.coils.forEach(coil => {
+        if (!coil.active && Math.hypot(coil.x - cx, coil.y - cy) < 80) {
+          coil.active = true;
+          this.openNearestGroup(coil.c, 'Y', '#facc15', 'シャッター開放!');
+        }
+      });
+      this.consumeCharge(4);
+    } else if (p.form === 5) {
+      p.actionCd = Math.round(22 * cdScale);
+      sfx.play('warp');
+      this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#c084fc', 12);
+      let bestX = p.x;
+      for (let s = 1; s <= 16; s++) {
+        const tx = p.x + p.dir * s * 6;
+        this.afterimages.push({ x: tx, y: p.y, color: '#c084fc', life: 12 });
+        if (!this.collidesRect(tx, p.y, p.w, p.h, true)) {
+          if (!this.collidesRect(tx, p.y, p.w, p.h, false)) bestX = tx;
+        } else break;
+      }
+      p.x = bestX;
+      this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#e9d5ff', 14);
+      this.consumeCharge(5);
+    }
+  }
+
+  openNearestGroup(sourceCol, charType, color, msg) {
+    let bestCol = -1, bestDist = 9999;
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = 0; c < this.cols; c++) {
+        if (this.grid[r][c] === charType) {
+          const d = Math.abs(c - sourceCol);
+          if (d < bestDist) { bestDist = d; bestCol = c; }
+        }
+      }
+    }
+    if (bestCol !== -1) {
+      for (let r = 0; r < this.rows; r++) {
+        if (this.grid[r][bestCol] === charType) {
+          this.grid[r][bestCol] = '.';
+          this.spawnBurst(bestCol * this.TILE + 16, r * this.TILE + 16, color, 10);
+        }
+      }
+      this.shake = 6;
+      this.score += 150;
+      this.updateHUD();
+      this.addFloatingText(bestCol * this.TILE - 20, 160, msg, color);
+      sfx.play('break');
+    }
+  }
+
+  collidesRect(x, y, w, h, ignorePhase = false) {
+    const left = Math.floor(x / this.TILE);
+    const right = Math.floor((x + w - 0.01) / this.TILE);
+    const top = Math.floor(y / this.TILE);
+    const bottom = Math.floor((y + h - 0.01) / this.TILE);
+    for (let r = top; r <= bottom; r++) {
+      for (let c = left; c <= right; c++) {
+        if (this.isSolid(r, c, ignorePhase)) return true;
+      }
+    }
+    return false;
+  }
+
+  checkGimmickHint() {
+    const p = this.player;
+    if (p.hintCd > 0) return;
+    const frontCol = Math.floor((p.dir > 0 ? p.x + p.w + 4 : p.x - 4) / this.TILE);
+    const midRow = Math.floor((p.y + p.h / 2) / this.TILE);
+    if (midRow >= 0 && midRow < this.rows && frontCol >= 0 && frontCol < this.cols) {
+      const ch = this.grid[midRow][frontCol];
+      if (ch === 'R' && p.form !== 1) {
+        this.addFloatingText(p.x - 30, p.y - 16, '🔥 赤の突進ブレイクで破壊！', '#ff4d5a');
+        p.hintCd = 90;
+      } else if (ch === 'G') {
+        this.addFloatingText(p.x - 35, p.y - 16, '🍀 緑のレーザーで的を撃とう！', '#34d399');
+        p.hintCd = 90;
+      } else if (ch === 'Y') {
+        this.addFloatingText(p.x - 35, p.y - 16, '⚡ 黄の放電でコイルを起動！', '#facc15');
+        p.hintCd = 90;
+      } else if (ch === 'P' && p.form !== 5) {
+        this.addFloatingText(p.x - 35, p.y - 16, '🌀 紫の瞬間ワープですり抜け！', '#c084fc');
+        p.hintCd = 90;
+      }
+    }
+  }
+
+  damagePlayer(amount = 1) {
+    const p = this.player;
+    if (p.invuln > 0 || p.dashTimer > 0) return;
+    p.hp -= amount;
+    p.invuln = this.puzzleStyle === 2 ? 95 : 65;
+    p.vy = -5.0;
+    this.shake = 8;
+    sfx.play('hit');
+    this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#ff4d5a', 16);
+    this.updateHUD();
+
+    if (p.hp <= 0) {
+      this.running = false;
+      this.gameOver = true;
+      if (window.puzzles) puzzles.setActive(false);
+      document.getElementById('overlayTitle').textContent = 'GAME OVER';
+      document.getElementById('overlayDesc').textContent = 'HPが0になりました。もう一度挑戦しよう！';
+      document.getElementById('overlayBtn').textContent = '▶ リトライ';
+      document.getElementById('overlayBanner').classList.remove('hidden');
+    }
+  }
+
+  update() {
+    if (!this.running) return;
+    const p = this.player;
+
+    if (p.invuln > 0) p.invuln--;
+    if (p.actionCd > 0) p.actionCd--;
+    if (p.zapTimer > 0) p.zapTimer--;
+    if (p.hintCd > 0) p.hintCd--;
+    if (this.shake > 0) this.shake *= 0.85;
+
+    const jumpPressed = this.keys.jump && !this.prevKeys.jump;
+    const actPressed = this.keys.action && !this.prevKeys.action;
+    this.prevKeys.jump = this.keys.jump;
+    this.prevKeys.action = this.keys.action;
+
+    if (actPressed) this.triggerSpecialAction();
+
+    let moveSpeed = 3.2;
+    if (this.puzzleStyle === 4) moveSpeed += 0.9;
+    if (p.form === 2 || p.airSkyGrace) moveSpeed += 0.35;
+    if (p.form === 5) moveSpeed += 1.1;
+
+    if (p.dashTimer > 0) {
+      p.dashTimer--;
+      p.vx = p.dir * 8.4;
+      p.vy = 0;
+      this.afterimages.push({ x: p.x, y: p.y, color: '#ff4d5a', life: 8 });
+    } else {
+      const accel = this.puzzleStyle === 3 ? 1 : 0.72;
+      if (this.keys.left) { p.vx = -moveSpeed; p.dir = -1; }
+      else if (this.keys.right) { p.vx = moveSpeed; p.dir = 1; }
+      else { p.vx *= (1 - accel * 0.35); if (Math.abs(p.vx) < 0.1) p.vx = 0; }
+
+      const isSkyActive = (p.form === 2 || p.airSkyGrace);
+      let grav = isSkyActive ? 0.34 : 0.46;
+      if (this.puzzleStyle === 2 && p.vy > 0 && !isSkyActive) grav += 0.12;
+      p.vy = Math.min(10, p.vy + grav);
+
+      if (isSkyActive && this.keys.jump && p.vy > 1.3) p.vy = 1.3;
+
+      if (jumpPressed) {
+        const jumpPow = (p.form === 2 ? -8.2 : -7.6) - (this.puzzleStyle === 3 ? 0.45 : 0);
+        if (p.onGround) {
+          p.vy = jumpPow;
+          p.onGround = false;
+          p.jumpsLeft = p.form === 2 ? 1 : 0;
+          sfx.play('jump');
+        } else if (isSkyActive && p.jumpsLeft > 0) {
+          p.vy = -7.8;
+          p.jumpsLeft--;
+          sfx.play('jump');
+          this.spawnBurst(p.x + p.w / 2, p.y + p.h, '#38bdf8', 8);
+        }
+      }
+    }
+
+    // X Movement
+    p.x += p.vx;
+    if (p.dashTimer > 0) {
+      const left = Math.floor(p.x / this.TILE);
+      const right = Math.floor((p.x + p.w) / this.TILE);
+      const top = Math.floor(p.y / this.TILE);
+      const bottom = Math.floor((p.y + p.h - 1) / this.TILE);
+      for (let r = top; r <= bottom; r++) {
+        for (let c = left; c <= right; c++) {
+          if (r >= 0 && r < this.rows && c >= 0 && c < this.cols && this.grid[r][c] === 'R') {
+            for (let rr = 0; rr < this.rows; rr++) {
+              if (this.grid[rr][c] === 'R') {
+                this.grid[rr][c] = '.';
+                this.spawnBurst(c * this.TILE + 16, rr * this.TILE + 16, '#ff4d5a', 10);
+              }
+            }
+            this.shake = 7;
+            this.score += 100;
+            this.updateHUD();
+            sfx.play('break');
+          }
+        }
+      }
+    }
+    if (this.collidesRect(p.x, p.y, p.w, p.h)) {
+      this.checkGimmickHint();
+      if (p.vx > 0) p.x = Math.floor((p.x + p.w - 0.01) / this.TILE) * this.TILE - p.w - 0.01;
+      else if (p.vx < 0) p.x = (Math.floor(p.x / this.TILE) + 1) * this.TILE + 0.01;
+      p.vx = 0; p.dashTimer = 0;
+    }
+
+    // Y Movement
+    const prevBottom = p.y + p.h;
+    p.y += p.vy;
+    p.onGround = false;
+    if (p.vy >= 0) {
+      const left = Math.floor((p.x + 2) / this.TILE);
+      const right = Math.floor((p.x + p.w - 2) / this.TILE);
+      const bottomRow = Math.floor((p.y + p.h) / this.TILE);
+      if (prevBottom <= bottomRow * this.TILE + 5) {
+        for (let c = left; c <= right; c++) {
+          if (this.isPlatform(bottomRow, c)) {
+            p.y = bottomRow * this.TILE - p.h;
+            p.vy = 0; p.onGround = true; p.airSkyGrace = false;
+            p.jumpsLeft = p.form === 2 ? 1 : 0;
+            break;
+          }
+        }
+      }
+    }
+    if (this.collidesRect(p.x, p.y, p.w, p.h)) {
+      if (p.vy > 0) {
+        p.y = Math.floor((p.y + p.h - 0.01) / this.TILE) * this.TILE - p.h - 0.01;
+        p.vy = 0; p.onGround = true; p.airSkyGrace = false;
+        p.jumpsLeft = p.form === 2 ? 1 : 0;
+      } else if (p.vy < 0) {
+        p.y = (Math.floor(p.y / this.TILE) + 1) * this.TILE + 0.01;
+        p.vy = 0;
+      }
+    }
+
+    this.blueSigns.forEach(bs => {
+      if (p.hintCd <= 0 && p.form !== 2 && Math.abs(p.x - bs.x) < 42 && Math.abs(p.y - bs.y) < 48) {
+        this.addFloatingText(p.x - 30, p.y - 16, '💧 青のウイング上昇で登ろう！', '#38bdf8');
+        p.hintCd = 110;
+      }
+    });
+
+    const cx = Math.floor((p.x + p.w / 2) / this.TILE);
+    const cy = Math.floor((p.y + p.h - 1) / this.TILE);
+    const midY = Math.floor((p.y + p.h / 2) / this.TILE);
+    if (cy >= 0 && cy < this.rows && cx >= 0 && cx < this.cols) {
+      if (this.grid[cy][cx] === 'S' && p.form !== 4) {
+        if (p.hintCd <= 0) {
+          this.addFloatingText(p.x - 30, p.y - 16, '⚡ 黄のエレキ形態でないと感電！', '#facc15');
+          p.hintCd = 70;
+        }
+        this.damagePlayer(1);
+      }
+      if (this.grid[midY][cx] === 'X' || this.grid[cy][cx] === 'X') {
+        this.winStage();
+        return;
+      }
+    }
+
+    if (p.y > this.rows * this.TILE + 40) {
+      p.x = p.spawnX; p.y = p.spawnY; p.vx = 0; p.vy = 0;
+      this.damagePlayer(1);
+    }
+
+    this.checkpoints.forEach(cp => {
+      if (!cp.active && Math.abs(p.x - cp.x) < 28 && Math.abs(p.y - cp.y) < 34) {
+        cp.active = true;
+        p.spawnX = cp.x; p.spawnY = cp.y - 4;
+        p.hp = Math.min(p.maxHp, p.hp + 1);
+        sfx.play('coin');
+        this.addFloatingText(cp.x, cp.y - 14, 'CHECKPOINT! HP+1', '#4ade80');
+        this.updateHUD();
+      }
+    });
+
+    this.coins.forEach(cn => {
+      if (!cn.taken && Math.hypot(p.x + p.w / 2 - cn.x, p.y + p.h / 2 - cn.y) < 22) {
+        cn.taken = true;
+        this.score += 30;
+        sfx.play('coin');
+        this.spawnBurst(cn.x, cn.y, '#fde047', 6);
+        this.updateHUD();
+      }
+    });
+
+    for (let i = this.projectiles.length - 1; i >= 0; i--) {
+      const pr = this.projectiles[i];
+      pr.x += pr.vx; pr.life--;
+      let remove = pr.life <= 0 || this.collidesRect(pr.x, pr.y, pr.w, pr.h);
+      this.targets.forEach(t => {
+        if (!t.hit && Math.hypot(pr.x + 6 - t.x, pr.y + 2 - t.y) < 18) {
+          t.hit = true; remove = true;
+          this.openNearestGroup(t.c, 'G', '#34d399', 'ゲート開放!');
+        }
+      });
+      this.enemies.forEach(en => {
+        if (!en.dead && pr.x < en.x + en.w && pr.x + pr.w > en.x && pr.y < en.y + en.h && pr.y + pr.h > en.y) {
+          en.dead = true; remove = true; this.score += 100;
+          sfx.play('break');
+          this.spawnBurst(en.x + en.w / 2, en.y + en.h / 2, '#34d399', 12);
+          this.updateHUD();
+        }
+      });
+      if (remove) this.projectiles.splice(i, 1);
+    }
+
+    for (let i = this.enemies.length - 1; i >= 0; i--) {
+      const en = this.enemies[i];
+      if (en.dead) { this.enemies.splice(i, 1); continue; }
+      if (en.type === 'drone') {
+        en.t += 0.06; en.x += en.vx; en.y = en.baseY + Math.sin(en.t) * 14;
+        if (this.collidesRect(en.x, en.y, en.w, en.h)) en.vx *= -1;
+      } else {
+        en.x += en.vx;
+        const fx = en.vx > 0 ? en.x + en.w + 2 : en.x - 2;
+        const fc = Math.floor(fx / this.TILE);
+        const fr = Math.floor((en.y + en.h + 4) / this.TILE);
+        const br = Math.floor((en.y + en.h / 2) / this.TILE);
+        if (this.isSolid(br, fc) || (!this.isSolid(fr, fc) && !this.isPlatform(fr, fc))) en.vx *= -1;
+      }
+
+      if (p.x < en.x + en.w && p.x + p.w > en.x && p.y < en.y + en.h && p.y + p.h > en.y) {
+        if (p.dashTimer > 0) {
+          en.dead = true; this.score += 120; sfx.play('break');
+          this.spawnBurst(en.x + en.w / 2, en.y + en.h / 2, '#ff4d5a', 14);
+          this.updateHUD();
+        } else if (en.type !== 'knight' && p.vy > 0 && p.y + p.h - p.vy <= en.y + 10) {
+          en.dead = true; p.vy = -6.5; this.score += 80; sfx.play('jump');
+          this.spawnBurst(en.x + en.w / 2, en.y + en.h / 2, '#a3e635', 12);
+          this.updateHUD();
+        } else {
+          this.damagePlayer(1);
+        }
+      }
+    }
+
+    this.particles = this.particles.filter(pt => { pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.12; return --pt.life > 0; });
+    this.afterimages = this.afterimages.filter(a => --a.life > 0);
+    this.floatingTexts = this.floatingTexts.filter(ft => { ft.y -= 0.6; return --ft.life > 0; });
+
+    const targetCam = Math.max(0, Math.min(this.cols * this.TILE - this.canvas.width, p.x - this.canvas.width * 0.38));
+    this.cameraX += (targetCam - this.cameraX) * 0.14;
+  }
+
+  winStage() {
+    this.running = false;
+    this.stageCleared = true;
+    if (window.puzzles) puzzles.setActive(false);
+    this.score += 500;
+    this.updateHUD();
+    sfx.play('win');
+    const isLast = this.stageIndex === STAGES.length - 1;
+    document.getElementById('overlayTitle').textContent = isLast ? '🎉 ALL STAGES CLEAR!' : '✨ STAGE CLEAR!';
+    document.getElementById('overlayDesc').innerHTML = isLast
+      ? `全ステージ制覇おめでとうございます！<br>最終スコア: <b style="color:#fde047">${this.score} pts</b>`
+      : `${STAGES[this.stageIndex].name} をクリアしました！<br>現在のスコア: <b style="color:#fde047">${this.score} pts</b>`;
+    document.getElementById('overlayBtn').textContent = isLast ? '▶ STAGE 1から遊ぶ' : '▶ 次のステージへ';
+    document.getElementById('overlayBanner').classList.remove('hidden');
+  }
+
+  draw() {
+    const ctx = this.ctx;
+    const W = this.canvas.width, H = this.canvas.height;
+    const T = this.TILE;
+
+    const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+    bgGrad.addColorStop(0, '#0a0f1d');
+    bgGrad.addColorStop(1, '#141c2f');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = 'rgba(148, 163, 184, 0.14)';
+    for (let i = 0; i < 36; i++) {
+      const sx = ((i * 97) - this.cameraX * 0.25) % W;
+      const sy = (i * 53) % (H - 80);
+      ctx.fillRect(sx < 0 ? sx + W : sx, sy, 2, 2);
+    }
+
+    ctx.save();
+    const sx = (Math.random() - 0.5) * this.shake;
+    const sy = (Math.random() - 0.5) * this.shake;
+    ctx.translate(-Math.floor(this.cameraX) + sx, sy);
+
+    const startCol = Math.max(0, Math.floor(this.cameraX / T) - 1);
+    const endCol = Math.min(this.cols - 1, Math.ceil((this.cameraX + W) / T) + 1);
+
+    for (let r = 0; r < this.rows; r++) {
+      for (let c = startCol; c <= endCol; c++) {
+        const ch = this.grid[r][c];
+        if (ch === '.') continue;
+        const x = c * T, y = r * T;
+
+        if (ch === '#') {
+          ctx.fillStyle = '#243047'; ctx.fillRect(x, y, T, T);
+          ctx.fillStyle = '#334363'; ctx.fillRect(x, y, T, 4);
+          ctx.strokeStyle = '#182030'; ctx.strokeRect(x + 0.5, y + 0.5, T - 1, T - 1);
+        } else if (ch === '=') {
+          ctx.fillStyle = '#38bdf8'; ctx.fillRect(x, y, T, 6);
+          ctx.fillStyle = '#1e3a5f'; ctx.fillRect(x, y + 6, T, 4);
+        } else if (ch === 'R') {
+          ctx.fillStyle = '#7f1d1d'; ctx.fillRect(x, y, T, T);
+          ctx.strokeStyle = '#ff4d5a'; ctx.lineWidth = 2;
+          ctx.strokeRect(x + 2, y + 2, T - 4, T - 4);
+          ctx.beginPath();
+          ctx.moveTo(x + 6, y + 6); ctx.lineTo(x + 16, y + 18); ctx.lineTo(x + 26, y + 10);
+          ctx.moveTo(x + 16, y + 18); ctx.lineTo(x + 10, y + 27);
+          ctx.stroke(); ctx.lineWidth = 1;
+          if (r === 8) { ctx.font = '14px sans-serif'; ctx.fillText('🔥', x + 7, y + 21); }
+        } else if (ch === 'G') {
+          ctx.fillStyle = 'rgba(16, 185, 129, 0.25)'; ctx.fillRect(x + 6, y, T - 12, T);
+          ctx.fillStyle = '#34d399'; ctx.fillRect(x + 13, y, 6, T);
+          if (r === 8) { ctx.font = '14px sans-serif'; ctx.fillText('🍀', x + 7, y + 21); }
+        } else if (ch === 'Y') {
+          ctx.fillStyle = '#713f12'; ctx.fillRect(x + 4, y, T - 8, T);
+          ctx.fillStyle = '#facc15';
+          for (let k = 4; k < T; k += 10) ctx.fillRect(x + 6, y + k, T - 12, 3);
+        } else if (ch === 'P') {
+          ctx.fillStyle = 'rgba(192, 132, 252, 0.25)'; ctx.fillRect(x + 6, y, T - 12, T);
+          ctx.strokeStyle = '#c084fc'; ctx.setLineDash([4, 4]);
+          ctx.strokeRect(x + 8, y + 1, T - 16, T - 2); ctx.setLineDash([]);
+          if (r === 8) { ctx.font = '14px sans-serif'; ctx.fillText('🌀', x + 7, y + 21); }
+        } else if (ch === 'S') {
+          ctx.fillStyle = '#facc15';
+          ctx.beginPath();
+          for (let i = 0; i < 3; i++) {
+            const bx = x + i * 10.6;
+            ctx.moveTo(bx, y + T); ctx.lineTo(bx + 5.3, y + T - 14); ctx.lineTo(bx + 10.6, y + T);
+          }
+          ctx.fill();
+        } else if (ch === 'X') {
+          const pulse = 0.6 + 0.4 * Math.sin(Date.now() * 0.006);
+          ctx.fillStyle = `rgba(56, 189, 248, ${pulse})`;
+          ctx.fillRect(x + 3, y - 8, T - 6, T + 8);
+          ctx.strokeStyle = '#fff'; ctx.strokeRect(x + 3, y - 8, T - 6, T + 8);
+          ctx.fillStyle = '#fff'; ctx.font = 'bold 10px sans-serif';
+          ctx.fillText('GOAL', x + 2, y - 12);
+        }
+      }
+    }
+
+    const arrowBob = Math.sin(Date.now() * 0.006) * 4;
+    this.blueSigns.forEach(bs => {
+      ctx.fillStyle = 'rgba(56, 189, 248, 0.22)';
+      ctx.fillRect(bs.x + 2, bs.y - 24, 28, 52);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.strokeRect(bs.x + 2, bs.y - 24, 28, 52);
+      ctx.fillStyle = '#7dd3fc';
+      ctx.font = 'bold 14px sans-serif';
+      ctx.fillText('▲', bs.x + 9, bs.y - 4 + arrowBob);
+      ctx.font = '14px sans-serif';
+      ctx.fillText('💧', bs.x + 7, bs.y + 18);
+    });
+
+    this.targets.forEach(t => {
+      ctx.beginPath(); ctx.arc(t.x, t.y, 11, 0, Math.PI * 2);
+      ctx.fillStyle = t.hit ? '#14532d' : '#34d399'; ctx.fill();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke(); ctx.lineWidth = 1;
+      if (!t.hit) { ctx.fillStyle = '#064e3b'; ctx.beginPath(); ctx.arc(t.x, t.y, 4, 0, Math.PI * 2); ctx.fill(); }
+    });
+
+    this.coils.forEach(cl => {
+      ctx.fillStyle = cl.active ? '#854d0e' : '#facc15';
+      ctx.fillRect(cl.x - 8, cl.y - 10, 16, 22);
+      ctx.fillStyle = '#fff'; ctx.font = '13px sans-serif';
+      ctx.fillText('⚡', cl.x - 7, cl.y + 6);
+    });
+
+    this.checkpoints.forEach(cp => {
+      ctx.fillStyle = '#94a3b8'; ctx.fillRect(cp.x + 14, cp.y - 4, 3, 36);
+      ctx.fillStyle = cp.active ? '#4ade80' : '#f43f5e';
+      ctx.beginPath();
+      ctx.moveTo(cp.x + 17, cp.y - 4); ctx.lineTo(cp.x + 33, cp.y + 4); ctx.lineTo(cp.x + 17, cp.y + 12);
+      ctx.fill();
+    });
+
+    const bob = Math.sin(Date.now() * 0.005) * 2.5;
+    this.coins.forEach(cn => {
+      if (cn.taken) return;
+      ctx.fillStyle = '#fde047'; ctx.beginPath(); ctx.arc(cn.x, cn.y + bob, 7, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#ca8a04'; ctx.stroke();
+    });
+
+    this.afterimages.forEach(a => {
+      ctx.fillStyle = a.color; ctx.globalAlpha = a.life / 16;
+      ctx.fillRect(a.x, a.y, this.player.w, this.player.h); ctx.globalAlpha = 1;
+    });
+
+    this.enemies.forEach(en => {
+      if (en.type === 'slime') {
+        ctx.fillStyle = '#a3e635'; ctx.beginPath();
+        ctx.roundRect(en.x, en.y + 6, en.w, en.h - 6, [10, 10, 3, 3]); ctx.fill();
+        ctx.fillStyle = '#0f172a'; ctx.fillRect(en.x + 5, en.y + 12, 4, 4); ctx.fillRect(en.x + 15, en.y + 12, 4, 4);
+      } else if (en.type === 'knight') {
+        ctx.fillStyle = '#f97316'; ctx.fillRect(en.x, en.y, en.w, en.h);
+        ctx.fillStyle = '#7c2d12'; ctx.fillRect(en.x + 2, en.y + 5, en.w - 4, 6);
+        ctx.fillStyle = '#e2e8f0'; ctx.beginPath();
+        ctx.moveTo(en.x + 4, en.y); ctx.lineTo(en.x + 8, en.y - 6); ctx.lineTo(en.x + 12, en.y);
+        ctx.moveTo(en.x + 14, en.y); ctx.lineTo(en.x + 18, en.y - 6); ctx.lineTo(en.x + 22, en.y);
+        ctx.fill();
+      } else if (en.type === 'drone') {
+        ctx.fillStyle = '#ec4899'; ctx.beginPath();
+        ctx.arc(en.x + en.w / 2, en.y + en.h / 2, 11, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.fillRect(en.x + 6, en.y + 8, 12, 4);
+      }
+    });
+
+    this.projectiles.forEach(pr => {
+      ctx.fillStyle = '#34d399'; ctx.shadowColor = '#34d399'; ctx.shadowBlur = 8;
+      ctx.fillRect(pr.x, pr.y, pr.w, pr.h); ctx.shadowBlur = 0;
+    });
+
+    const p = this.player;
+    if (p.invuln % 6 < 4) {
+      const bodyColor = p.form === 0 ? '#cbd5e1' : COLORS[p.form - 1].color;
+      if (p.zapTimer > 0) {
+        ctx.strokeStyle = '#facc15'; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(p.x + p.w / 2, p.y + p.h / 2, 72 * (1 - p.zapTimer / 22) + 14, 0, Math.PI * 2);
+        ctx.stroke(); ctx.lineWidth = 1;
+      }
+
+      ctx.fillStyle = bodyColor;
+      ctx.beginPath(); ctx.roundRect(p.x, p.y, p.w, p.h, 6); ctx.fill();
+
+      if (p.form === 1) {
+        ctx.fillStyle = '#fff'; ctx.beginPath();
+        ctx.moveTo(p.x + 3, p.y); ctx.lineTo(p.x + 6, p.y - 6); ctx.lineTo(p.x + 10, p.y);
+        ctx.moveTo(p.x + p.w - 3, p.y); ctx.lineTo(p.x + p.w - 6, p.y - 6); ctx.lineTo(p.x + p.w - 10, p.y);
+        ctx.fill();
+      } else if (p.form === 2 || p.airSkyGrace) {
+        ctx.fillStyle = '#e0f2fe'; ctx.beginPath();
+        const wx = p.dir > 0 ? p.x - 8 : p.x + p.w;
+        ctx.moveTo(p.dir > 0 ? p.x : p.x + p.w, p.y + 8); ctx.lineTo(wx, p.y + 2); ctx.lineTo(wx, p.y + 18); ctx.fill();
+      } else if (p.form === 3) {
+        ctx.fillStyle = '#064e3b'; ctx.fillRect(p.dir > 0 ? p.x + p.w - 2 : p.x - 7, p.y + 12, 9, 6);
+      } else if (p.form === 4) {
+        ctx.strokeStyle = '#fef08a'; ctx.beginPath();
+        ctx.arc(p.x + p.w / 2, p.y + p.h / 2, 18, 0, Math.PI * 2); ctx.stroke();
+      } else if (p.form === 5) {
+        ctx.fillStyle = '#7e22ce'; ctx.fillRect(p.dir > 0 ? p.x - 9 : p.x + p.w, p.y + 8, 9, 5);
+      }
+
+      ctx.fillStyle = '#0f172a';
+      const eyeX = p.dir > 0 ? p.x + 11 : p.x + 3;
+      ctx.fillRect(eyeX, p.y + 6, 8, 5);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(p.dir > 0 ? eyeX + 4 : eyeX + 1, p.y + 7, 3, 3);
+    }
+
+    this.particles.forEach(pt => {
+      ctx.fillStyle = pt.color; ctx.globalAlpha = Math.min(1, pt.life / 15);
+      ctx.fillRect(pt.x, pt.y, pt.size, pt.size); ctx.globalAlpha = 1;
+    });
+
+    ctx.font = 'bold 12px sans-serif';
+    this.floatingTexts.forEach(ft => {
+      ctx.fillStyle = ft.color; ctx.globalAlpha = Math.min(1, ft.life / 20);
+      ctx.fillText(ft.text, ft.x, ft.y); ctx.globalAlpha = 1;
+    });
+
+    ctx.restore();
+  }
+
+  loop() {
+    this.update();
+    this.draw();
+    requestAnimationFrame(() => this.loop());
+  }
+}
+
+/* =========================================================
+   6. BOOTSTRAP
+   ========================================================= */
+window.puzzles = new MatchPuzzleManager();
+window.game = new ActionGame();
+</script>
+</body>
+</html>
