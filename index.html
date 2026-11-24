@@ -275,6 +275,16 @@
     background: #1c273d;
     box-shadow: 0 0 14px rgba(255,255,255,0.14);
   }
+  .form-slot.awakened {
+    border-color: #fde047 !important;
+    box-shadow: 0 0 12px rgba(253, 224, 71, 0.55);
+  }
+  .awaken-badge {
+    color: #fde047;
+    font-weight: 900;
+    font-size: 0.72rem;
+    margin-top: 2px;
+  }
   .form-slot .key-num {
     position: absolute;
     top: 3px; left: 5px;
@@ -709,6 +719,8 @@
       <div><b style="color:#facc15">⚡ 黄×3</b>：電流無効・疾走＆放電バリア(+時間延長)</div>
       <div><b style="color:#c084fc">🌀 紫×3</b>：壁抜けワープ斬り(+時間延長)</div>
       <div><b style="color:#7dd3fc">💎 隠し</b>：複数色コンボで上空の秘密ルートへ！</div>
+      <div><b style="color:#c084fc">👑 カラーシフト・ボス</b>：弱点の色が変わる！同じ色のアクションで大ダメージ＆スタン、違う色は反撃される！</div>
+      <div><b style="color:#fde047">🔥 覚醒</b>：4つ以上同時消しで数秒間アクション強化！（5つ消しはさらに長い）</div>
     </div>
   </section>
 </div>
@@ -931,6 +943,8 @@ class MatchPuzzleManager {
     this.busy = false;
     this.poppingSet = new Set();
     this.dropMap = null;
+    this.maxChain = 0;
+    this.moveCount = 0;
 
     for (let m = 1; m <= 5; m++) {
       this.boards[m] = this.createInitialBoard(m, 0);
@@ -1016,6 +1030,48 @@ class MatchPuzzleManager {
     if (addedOnCurrent > 0) {
       this.dropMap = drops;
       this.showToast(`🪨 被弾！お邪魔ブロック ×${addedOnCurrent} 追加！`, '#f87171');
+    }
+    this.renderBoard();
+  }
+
+  // ボスの妨害: 定期的にお邪魔ブロックを降らせる(今の盤面+2、他+1、盤面ごと最大8個)
+  addJunkRain() {
+    if (!this.active) return;
+    const drops = Array.from({ length: this.N }, () => Array(this.N).fill(0));
+    let addedOnCurrent = 0;
+
+    for (let m = 1; m <= 5; m++) {
+      const b = this.boards[m];
+      const countToAdd = (m === this.mode) ? 2 : 1;
+      for (let k = 0; k < countToAdd; k++) {
+        if (this.countJunk(b) >= 8) break;
+        const candidates = [];
+        for (let r = 0; r < this.N; r++) {
+          for (let c = 0; c < this.N; c++) {
+            if (b[r][c] >= 0) candidates.push([r, c]);
+          }
+        }
+        if (!candidates.length) break;
+        const [rr, cc] = candidates[Math.floor(Math.random() * candidates.length)];
+        b[rr][cc] = JUNK;
+        if (m === this.mode) {
+          drops[rr][cc] = rr + 2;
+          addedOnCurrent++;
+        }
+      }
+      if (m === 1 && !this.hasValidSwapMove(b)) {
+        this.boards[1] = this.createInitialBoard(1, this.countJunk(b));
+      }
+    }
+
+    if (this.selected) {
+      const [sr, sc] = this.selected;
+      if (this.boards[this.mode][sr][sc] === JUNK) this.selected = null;
+    }
+
+    if (addedOnCurrent > 0) {
+      this.dropMap = drops;
+      this.showToast(`💀 ボスの妨害！お邪魔ブロック ×${addedOnCurrent} 降臨！`, '#c084fc');
     }
     this.renderBoard();
   }
@@ -1196,6 +1252,7 @@ class MatchPuzzleManager {
 
     this.busy = true;
     if (window.game) game.syncPauseUI();
+    this.maxChain = Math.max(this.maxChain, combo);
     this.poppingSet = new Set([...matchedCells, ...adjacentJunk]);
     sfx.play('match', combo);
     if (adjacentJunk.size > 0) sfx.play('break');
@@ -1212,6 +1269,11 @@ class MatchPuzzleManager {
         const cInfo = COLORS[col];
         game.extendColorTime(cInfo.formId, addSec);
         msgs.push(`${cInfo.icon}${cInfo.name} +${addSec}秒`);
+        // 4つ以上同時消し: 数秒間の覚醒状態を付与(4消し5秒・5消し8秒)
+        if (cnt >= 4) {
+          game.awakenColor(cInfo.formId, cnt >= 5 ? 480 : 300);
+          msgs.push(`🔥${cInfo.name}覚醒！`);
+        }
       }
     }
     if (msgs.length) {
@@ -1285,6 +1347,7 @@ class MatchPuzzleManager {
       }
       if (Math.abs(sr - r) + Math.abs(sc - c) === 1) {
         [b[sr][sc], b[r][c]] = [b[r][c], b[sr][sc]];
+        this.moveCount++;
         if (this.findMatches(b).matchedCells.size > 0) {
           this.selected = null;
           this.resolveMatches(1);
@@ -1310,6 +1373,7 @@ class MatchPuzzleManager {
       if (Math.abs(r - er) + Math.abs(c - ec) === 1) {
         b[er][ec] = b[r][c];
         b[r][c] = -1;
+        this.moveCount++;
         sfx.play('click');
         this.resolveMatches(1);
       }
@@ -1326,6 +1390,7 @@ class MatchPuzzleManager {
           b[nr][nc] = (b[nr][nc] + 1) % 5;
         }
       });
+      this.moveCount++;
       sfx.play('click');
       this.resolveMatches(1);
     }
@@ -1340,6 +1405,7 @@ class MatchPuzzleManager {
     b[r + 1][c] = b[r + 1][c + 1];
     b[r + 1][c + 1] = b[r][c + 1];
     b[r][c + 1] = tmp;
+    this.moveCount++;
     sfx.play('click');
     this.resolveMatches(1);
   }
@@ -1363,6 +1429,7 @@ class MatchPuzzleManager {
         b[this.N - 1][idx] = first;
       }
     }
+    this.moveCount++;
     sfx.play('click');
     this.resolveMatches(1);
   }
@@ -1560,7 +1627,7 @@ const STAGES = [
       '#     o      R     F     P  #            M     G   ###################  R                M    X  #',
       '#    ===     R           P  #     K      M     G   #                 #  R                M   ### #',
       '#            R     E     P  #   #####  F M     G   #          C  Y   #  R           W    M       #',
-      '#  @         R    ###    P  #          H M     G   #          #  Y   #  R       o  ### E M   o   #',
+      '#  @         R    ###    P  #          H M     G   #          #  Y   #  R   Q   o  ### E M   o   #',
       '#############R###########P###############M#####G####SSSSSS#####  Y###R##R################M########',
       '##################################################################################################'
     ]
@@ -1582,6 +1649,10 @@ class ActionGame {
     this.stageScores = [0, 0, 0];
     this.stageStartScore = 0;
     this.lastTotalScore = null;
+    this.playFrames = 0;
+    this.boss = null;
+    this.enemyShots = [];
+    this.clones = [];
     this.running = false;
     this.puzzlePaused = false;
     this.puzzleStyle = 1;
@@ -1680,10 +1751,12 @@ class ActionGame {
       sfx.init();
       document.getElementById('overlayBanner').classList.add('hidden');
       if (this.stageCleared) {
-        // 最終ステージをクリアして最初から遊ぶときはスコアをリセットする
+        // 最終ステージをクリアして最初から遊ぶときはスコア・記録をリセットする
         if (this.stageIndex === STAGES.length - 1) {
           this.score = 0;
           this.stageScores = [0, 0, 0];
+          this.playFrames = 0;
+          if (window.puzzles) { puzzles.maxChain = 0; puzzles.moveCount = 0; }
         }
         this.loadStage((this.stageIndex + 1) % STAGES.length, false);
       } else if (this.gameOver) {
@@ -1709,6 +1782,8 @@ class ActionGame {
     if (showTitle) {
       this.score = 0;
       this.stageScores = [0, 0, 0];
+      this.playFrames = 0;
+      if (window.puzzles) { puzzles.maxChain = 0; puzzles.moveCount = 0; }
     }
     this.stageStartScore = this.score;
     [1, 2, 3].forEach(n => document.getElementById('btnStage' + n).classList.toggle('active', idx === n - 1));
@@ -1720,6 +1795,9 @@ class ActionGame {
     this.cols = Math.max(...data.map.map(s => s.length));
     this.grid = Array.from({ length: this.rows }, () => Array(this.cols).fill('.'));
     this.enemies = [];
+    this.boss = null;
+    this.enemyShots = [];
+    this.clones = [];
     this.coins = [];
     this.gems = [];
     this.hearts = [];
@@ -1760,6 +1838,15 @@ class ActionGame {
         else if (ch === 'K') this.enemies.push({ type: 'knight', col: c, x: wx + 3, y: wy + 4, w: 26, h: 28, vx: -0.75, hp: 1, maxHp: 1, hitCd: 0 });
         else if (ch === 'F') this.enemies.push({ type: 'drone', col: c, x: wx + 4, y: wy + 4, baseY: wy + 4, w: 24, h: 22, vx: 1.1, t: Math.random() * 6, hp: 1, maxHp: 1, hitCd: 0 });
         else if (ch === 'W') this.enemies.push({ type: 'guardian', col: c, x: wx, y: wy - 4, w: 32, h: 36, vx: -0.65, hp: 3, maxHp: 3, hitCd: 0 });
+        else if (ch === 'Q') {
+          // ステージ3終盤のカラーシフト・ボス(HP10・4秒ごとに弱点の色が変わる)
+          const b0 = 1 + Math.floor(Math.random() * 5);
+          let b1 = 1 + Math.floor(Math.random() * 5);
+          while (b1 === b0) b1 = 1 + Math.floor(Math.random() * 5);
+          const boss = { type: 'boss', col: c, x: wx - 6, y: wy - 12, w: 44, h: 44, vx: 0.6, hp: 10, maxHp: 10, hitCd: 0, activated: false, rainCd: 0, shootCd: 0, barrier: b0, nextBarrier: b1, barrierTimer: 240, stunTimer: 0, counterCd: 0 };
+          this.enemies.push(boss);
+          this.boss = boss;
+        }
         else if (ch !== ' ') {
           this.grid[r][c] = ch;
           if (ch === 'M') mCols.add(c);
@@ -1794,8 +1881,10 @@ class ActionGame {
       invuln: 0,
       form: 0,
       timers: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+      awaken: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
       actionCd: 0,
       dashTimer: 0,
+      dashPower: 1,
       diveTimer: 0,
       coyoteTimer: 0,
       jumpBufferTimer: 0,
@@ -1811,11 +1900,15 @@ class ActionGame {
       this.running = false;
       if (window.puzzles) puzzles.setActive(false);
       document.getElementById('overlayTitle').textContent = 'PUZZLE SHIFT KNIGHT';
+      const best = this.loadHighScore();
       document.getElementById('overlayDesc').innerHTML =
         'パズルで同じ色を3つ揃えると、その色の<b>特殊アクションと強化された動きが使える時間が延長</b>されます！<br>' +
         'さらに<b>複数のアクションを組み合わせる「上空の隠しルート（💎）」</b>も各ステージに存在します！' +
+        (best
+          ? `<br>🏆 ハイスコア: <b style="color:#fde047">${best.score} pts</b> (ランク ${best.rank})`
+          : '') +
         (this.lastTotalScore !== null
-          ? `<br><br>前回の最終トータルスコア: <b style="color:#fde047">${this.lastTotalScore} pts</b>`
+          ? `<br>前回の最終トータルスコア: <b style="color:#fde047">${this.lastTotalScore} pts</b>`
           : '');
       document.getElementById('overlayBtn').textContent = '▶ START';
       document.getElementById('overlayBtnTitle').style.display = 'none';
@@ -1857,6 +1950,16 @@ class ActionGame {
     this.updateHUD(true);
   }
 
+  // 覚醒: 指定色のアクションを数秒間強化する
+  awakenColor(formId, frames) {
+    const p = this.player;
+    p.awaken[formId] = Math.max(p.awaken[formId], frames);
+    const cInfo = COLORS[formId - 1];
+    this.addFloatingText(p.x - 10, p.y - 26, `🔥 ${cInfo.icon}${cInfo.name} 覚醒！`, '#fde047');
+    this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#fde047', 18);
+    this.renderFormBar();
+  }
+
   switchForm(formId) {
     if (!this.running) return;
     const p = this.player;
@@ -1886,7 +1989,9 @@ class ActionGame {
       const pct = Math.min(100, (frames / (60 * 24)) * 100);
 
       const slot = document.createElement('div');
-      slot.className = 'form-slot' + (ready ? ' ready' : '') + (active ? ' active' : '');
+      const awakened = this.player.awaken[fid] > 0;
+      slot.className = 'form-slot' + (ready ? ' ready' : '') + (active ? ' active' : '') + (awakened ? ' awakened' : '');
+      slot.id = `formSlot${fid}`;
       if (active) slot.style.borderColor = cInfo.color;
       slot.innerHTML = `
         <span class="key-num">${fid}</span>
@@ -1894,6 +1999,7 @@ class ActionGame {
         <div class="f-icon">${cInfo.icon}</div>
         <div class="f-name" style="color:${ready ? cInfo.color : '#64748b'}">${cInfo.name}</div>
         <div class="f-act">${cInfo.actionName}</div>
+        <div class="awaken-badge" id="slotAwaken${fid}" style="display:${awakened ? 'block' : 'none'}">🔥覚醒 ${(this.player.awaken[fid] / 60).toFixed(1)}s</div>
         <div class="time-bar-track"><div class="time-bar-fill" id="slotBar${fid}" style="width:${pct}%; background:${cInfo.color}"></div></div>
       `;
       slot.onclick = () => this.switchForm(fid);
@@ -1915,6 +2021,15 @@ class ActionGame {
         const pct = Math.min(100, (frames / (60 * 24)) * 100);
         barEl.style.width = `${pct}%`;
       }
+      const aw = this.player.awaken[fid];
+      const awEl = document.getElementById(`slotAwaken${fid}`);
+      const slotEl = document.getElementById(`formSlot${fid}`);
+      if (awEl) {
+        awEl.style.display = aw > 0 ? 'block' : 'none';
+        const text = `🔥覚醒 ${(aw / 60).toFixed(1)}s`;
+        if (awEl.textContent !== text) awEl.textContent = text;
+      }
+      if (slotEl) slotEl.classList.toggle('awakened', aw > 0);
     });
   }
 
@@ -1941,7 +2056,7 @@ class ActionGame {
     } else {
       const cInfo = COLORS[p.form - 1];
       const sec = (p.timers[p.form] / 60).toFixed(1);
-      nextText = `${cInfo.icon} ${cInfo.name} (${sec}s)`;
+      nextText = `${cInfo.icon} ${cInfo.name}${p.awaken[p.form] > 0 ? ' 🔥覚醒' : ''} (${sec}s)`;
       if (force || this._lastFormBadgeText !== nextText) {
         badge.textContent = nextText;
         badge.style.borderColor = cInfo.color;
@@ -1981,15 +2096,47 @@ class ActionGame {
 
   hitEnemy(en, dmg = 1, color = '#fb923c') {
     if (en.dead || en.hitCd > 0) return false;
+    const ex = en.x + en.w / 2, ey = en.y + en.h / 2;
+    // カラーシフト・ボス: バリアと同じ色のアクションだけが効く
+    if (en.type === 'boss') {
+      const p = this.player;
+      en.hitCd = 16;
+      if (p.form === en.barrier) {
+        // 同色: 大ダメージ(3)＆スタン(2秒)
+        en.hp -= 3;
+        en.stunTimer = 120;
+        if (en.hp <= 0) {
+          en.dead = true;
+          this.score += 1000;
+          sfx.play('break');
+          this.spawnBurst(ex, ey, color, 30);
+          this.addFloatingText(en.x - 20, en.y - 14, '👑 ボス撃破！+1000', '#fde047');
+        } else {
+          sfx.play('hit');
+          this.spawnBurst(ex, ey, '#fff', 8);
+          this.addFloatingText(en.x - 10, en.y - 12, `💥 弱点ヒット！HP ${en.hp}/${en.maxHp}`, '#fde047');
+        }
+        this.updateHUD(true);
+        return true;
+      }
+      // 異色: バリアに弾かれて反撃を受ける(ダメージなし)
+      this.addFloatingText(en.x - 10, en.y - 12, '🛡 バリア！色が違う！', '#94a3b8');
+      sfx.play('hit');
+      if (en.counterCd <= 0) {
+        en.counterCd = 45;
+        this.fireBossVolley(en, 3, 2.6);
+      }
+      return true;
+    }
     en.hp -= dmg;
     en.hitCd = 16;
-    const ex = en.x + en.w / 2, ey = en.y + en.h / 2;
     if (en.hp <= 0) {
       en.dead = true;
-      this.score += en.type === 'guardian' ? 300 : 100;
+      this.score += en.type === 'boss' ? 1000 : en.type === 'guardian' ? 300 : 100;
       sfx.play('break');
-      this.spawnBurst(ex, ey, color, en.type === 'guardian' ? 24 : 14);
+      this.spawnBurst(ex, ey, color, en.type === 'boss' ? 30 : en.type === 'guardian' ? 24 : 14);
       if (en.type === 'guardian') this.addFloatingText(en.x - 10, en.y - 12, 'ガーディアン撃破!', '#fde047');
+      if (en.type === 'boss') this.addFloatingText(en.x - 20, en.y - 14, '👑 ボス撃破！+1000', '#fde047');
     } else {
       sfx.play('hit');
       this.spawnBurst(ex, ey, '#fff', 8);
@@ -1997,6 +2144,20 @@ class ActionGame {
     }
     this.updateHUD(true);
     return true;
+  }
+
+  // ボスの弾: プレイヤーに向けて扇状に撃つ
+  fireBossVolley(boss, count, speed = 2.4) {
+    const p = this.player;
+    const bx = boss.x + boss.w / 2, by = boss.y + boss.h / 2;
+    const px = p.x + p.w / 2, py = p.y + p.h / 2;
+    const base = Math.atan2(py - by, px - bx);
+    const offsets = count === 1 ? [0] : [-0.35, 0, 0.35];
+    offsets.forEach(off => {
+      const a = base + off;
+      this.enemyShots.push({ x: bx - 4, y: by - 4, vx: Math.cos(a) * speed, vy: Math.sin(a) * speed, life: 200 });
+    });
+    sfx.play('shoot');
   }
 
   checkEnemyGates() {
@@ -2034,11 +2195,14 @@ class ActionGame {
     const cdScale = this.puzzleStyle === 5 ? 0.55 : 1.0;
 
     if (p.form === 1) {
-      p.dashTimer = 17;
+      // 覚醒・赤: 突進距離2倍(17→34フレーム)・威力3倍(ガーディアンも一撃)
+      p.dashTimer = p.awaken[1] > 0 ? 34 : 17;
+      p.dashPower = p.awaken[1] > 0 ? 3 : 1;
       p.actionCd = Math.round(22 * cdScale);
       p.vy = 0;
       sfx.play('dash');
       this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#ff4d5a', 12);
+      if (p.awaken[1] > 0) this.addFloatingText(p.x - 10, p.y - 16, '🔥 覚醒突進！', '#ff4d5a');
     } else if (p.form === 2) {
       // 青・スカイ: 上昇中に再びACTを押すとスカイダイブ(急降下攻撃)。
       // 地上や落下中は今まで通りの大上昇。
@@ -2061,7 +2225,15 @@ class ActionGame {
     } else if (p.form === 3) {
       const spd = p.dir * 9.0;
       const sx = p.dir > 0 ? p.x + p.w : p.x - 10;
-      this.projectiles.push({ x: sx, y: p.y + 10, vx: spd, vy: 0, w: 13, h: 5, dmg: 1, life: 60 });
+      if (p.awaken[3] > 0) {
+        // 覚醒・3WAYレーザー: 水平+上下斜め
+        this.projectiles.push({ x: sx, y: p.y + 10, vx: spd, vy: 0, w: 13, h: 5, dmg: 1, life: 60 });
+        this.projectiles.push({ x: sx, y: p.y + 10, vx: spd, vy: -5.4, w: 13, h: 5, dmg: 1, life: 60 });
+        this.projectiles.push({ x: sx, y: p.y + 10, vx: spd, vy: 5.4, w: 13, h: 5, dmg: 1, life: 60 });
+        this.addFloatingText(p.x - 10, p.y - 16, '🍀 3WAYレーザー!', '#34d399');
+      } else {
+        this.projectiles.push({ x: sx, y: p.y + 10, vx: spd, vy: 0, w: 13, h: 5, dmg: 1, life: 60 });
+      }
       p.actionCd = Math.round(12 * cdScale);
       sfx.play('shoot');
     } else if (p.form === 4) {
@@ -2073,10 +2245,15 @@ class ActionGame {
       const radius = 104;
       this.spawnBurst(cx, cy, '#facc15', 22);
       this.enemies.forEach(en => {
-        if (Math.hypot(en.x + en.w / 2 - cx, en.y + en.h / 2 - cy) < radius) {
+        if (p.awaken[4] > 0) {
+          // 覚醒・全画面落雷: 画面内の全敵に落雷
+          this.spawnBurst(en.x + en.w / 2, en.y + en.h / 2, '#facc15', 10);
+          this.hitEnemy(en, 1, '#facc15');
+        } else if (Math.hypot(en.x + en.w / 2 - cx, en.y + en.h / 2 - cy) < radius) {
           this.hitEnemy(en, 1, '#facc15');
         }
       });
+      if (p.awaken[4] > 0) this.addFloatingText(p.x - 10, p.y - 16, '⚡ 全画面落雷!', '#facc15');
       this.coils.forEach(coil => {
         if (!coil.active && Math.hypot(coil.x - cx, coil.y - cy) < radius) {
           coil.active = true;
@@ -2096,17 +2273,25 @@ class ActionGame {
         } else break;
       }
       // 紫・シャドウ: ワープ斬り。ワープ経路上の敵をすり抜けざまに斬る。
+      const warpFromX = p.x;
       const warpX0 = Math.min(p.x, bestX);
       const warpX1 = Math.max(p.x, bestX) + p.w;
       let slashed = 0;
       this.enemies.forEach(en => {
         if (!en.dead && en.x + en.w > warpX0 && en.x < warpX1 &&
             en.y + en.h > p.y - 6 && en.y < p.y + p.h + 6) {
-          if (this.hitEnemy(en, 1, '#c084fc')) slashed++;
+          const hpBefore = en.hp;
+          if (this.hitEnemy(en, 1, '#c084fc') && en.hp < hpBefore) slashed++;
         }
       });
       p.x = bestX;
       if (slashed > 0) this.addFloatingText(p.x - 10, p.y - 16, `🌀 ワープ斬り! ×${slashed}`, '#c084fc');
+      if (p.awaken[5] > 0) {
+        // 覚醒・分身: ワープ前の位置に分身を残し、プレイヤーに長い無敵時間(2秒)を付与
+        this.clones.push({ x: warpFromX, y: p.y, w: p.w, h: p.h, life: 180 });
+        p.invuln = Math.max(p.invuln, 120);
+        this.addFloatingText(p.x - 10, p.y - 16, '🌀 分身出現！無敵2秒', '#c084fc');
+      }
       this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#e9d5ff', 14);
     }
   }
@@ -2237,6 +2422,15 @@ class ActionGame {
       }
     }
 
+    // 覚醒タイマーを減らす(切れたらフォームバーを更新)
+    for (let fid = 1; fid <= 5; fid++) {
+      if (p.awaken[fid] > 0) {
+        p.awaken[fid]--;
+        if (p.awaken[fid] === 0) this.renderFormBar();
+      }
+    }
+    this.updateSlotTimersOnly();
+
     if (p.invuln > 0) p.invuln--;
     if (p.actionCd > 0) p.actionCd--;
     if (p.zapTimer > 0) p.zapTimer--;
@@ -2298,6 +2492,12 @@ class ActionGame {
           p.jumpBufferTimer = 0;
           p.jumpsLeft = p.form === 2 ? 2 : 0;
           sfx.play('jump');
+        } else if (p.form === 2 && p.awaken[2] > 0 && !p.onGround) {
+          // 覚醒・ホバリング: 空中で何回でも小ジャンプ
+          p.vy = -5.2;
+          p.jumpBufferTimer = 0;
+          sfx.play('jump');
+          this.spawnBurst(p.x + p.w / 2, p.y + p.h, '#38bdf8', 6);
         } else if (isSkyActive && p.jumpsLeft > 0) {
           p.vy = -7.4;
           p.jumpsLeft--;
@@ -2416,8 +2616,15 @@ class ActionGame {
         this.damagePlayer(1);
       }
       if (this.grid[midY][cx] === 'X' || this.grid[cy][cx] === 'X') {
-        this.winStage();
-        return;
+        if (this.boss && !this.boss.dead) {
+          if (p.hintCd <= 0) {
+            this.addFloatingText(p.x - 40, p.y - 16, '👑 ボスを倒してから進もう！', '#c084fc');
+            p.hintCd = 90;
+          }
+        } else {
+          this.winStage();
+          return;
+        }
       }
     }
 
@@ -2504,6 +2711,8 @@ class ActionGame {
       if (en.type === 'drone') {
         en.t += 0.05; en.x += en.vx; en.y = en.baseY + Math.sin(en.t) * 14;
         if (this.collidesRect(en.x, en.y, en.w, en.h)) en.vx *= -1;
+      } else if (en.type === 'boss' && en.stunTimer > 0) {
+        // スタン中のボスは動かない
       } else {
         en.x += en.vx;
         const fx = en.vx > 0 ? en.x + en.w + 2 : en.x - 2;
@@ -2515,13 +2724,13 @@ class ActionGame {
 
       if (p.x < en.x + en.w && p.x + p.w > en.x && p.y < en.y + en.h && p.y + p.h > en.y) {
         if (p.dashTimer > 0) {
-          this.hitEnemy(en, 1, '#ff4d5a');
+          this.hitEnemy(en, p.dashPower || 1, '#ff4d5a');
         } else if (p.diveTimer > 0) {
           // スカイダイブ中は触れた敵に1ダメージを与え、跳ね返る(被弾しない)
           this.hitEnemy(en, 1, '#38bdf8');
           p.vy = -6.2;
           p.diveTimer = 0;
-        } else if (en.type !== 'knight' && en.type !== 'guardian' && p.vy > 0 && p.y + p.h - p.vy <= en.y + 10) {
+        } else if (en.type !== 'knight' && en.type !== 'guardian' && en.type !== 'boss' && p.vy > 0 && p.y + p.h - p.vy <= en.y + 10) {
           this.hitEnemy(en, 1, '#a3e635');
           p.vy = -5.8;
         } else {
@@ -2532,12 +2741,116 @@ class ActionGame {
 
     this.checkEnemyGates();
 
+    // ボス戦: 近づくと出現し、定期的にお邪魔ブロックを降らせて弾を撃つ
+    const boss = this.boss;
+    if (boss && !boss.dead) {
+      if (!boss.activated && this.stageIndex === 2 && Math.abs(p.x - boss.x) < 360) {
+        boss.activated = true;
+        boss.rainCd = 420;
+        boss.shootCd = 90;
+        const bInfo = COLORS[boss.barrier - 1];
+        this.addFloatingText(boss.x - 20, boss.y - 18, `👑 カラーシフト・ボス出現！今は${bInfo.icon}${bInfo.name}のバリア！`, bInfo.color);
+        sfx.play('zap');
+        this.shake = 6;
+      }
+      if (boss.counterCd > 0) boss.counterCd--;
+      if (boss.stunTimer > 0) {
+        // スタン中は動かず、弾・雨・バリア変化も止まる
+        boss.stunTimer--;
+      } else if (boss.activated) {
+        if (boss.rainCd > 0) boss.rainCd--;
+        else {
+          boss.rainCd = 480;
+          if (window.puzzles) puzzles.addJunkRain();
+          this.shake = 5;
+          this.addFloatingText(boss.x - 30, boss.y - 18, '💀 お邪魔ブロック降臨！', '#c084fc');
+        }
+        if (boss.shootCd > 0) boss.shootCd--;
+        else {
+          boss.shootCd = 150;
+          this.fireBossVolley(boss, 1, 2.4);
+        }
+        // バリアの色が4秒ごとに変わる
+        if (boss.barrierTimer > 0) boss.barrierTimer--;
+        else {
+          boss.barrierTimer = 240;
+          boss.barrier = boss.nextBarrier;
+          let nb = 1 + Math.floor(Math.random() * 5);
+          while (nb === boss.barrier) nb = 1 + Math.floor(Math.random() * 5);
+          boss.nextBarrier = nb;
+          const cInfo = COLORS[boss.barrier - 1];
+          this.addFloatingText(boss.x - 20, boss.y - 18, `🛡 バリア変化！今は${cInfo.icon}${cInfo.name}！`, cInfo.color);
+          sfx.play('zap');
+        }
+      }
+    }
+
+    // ボスの弾
+    for (let i = this.enemyShots.length - 1; i >= 0; i--) {
+      const s = this.enemyShots[i];
+      s.x += s.vx; s.y += s.vy; s.life--;
+      let remove = s.life <= 0 || this.collidesRect(s.x, s.y, 8, 8);
+      if (!remove && p.x < s.x + 8 && p.x + p.w > s.x && p.y < s.y + 8 && p.y + p.h > s.y) {
+        this.damagePlayer(1);
+        remove = true;
+      }
+      if (remove) this.enemyShots.splice(i, 1);
+    }
+
+    // 分身: 触れた敵にダメージを与えながら3秒で消える
+    this.clones = this.clones.filter(cl => {
+      cl.life--;
+      if (cl.life <= 0) return false;
+      this.enemies.forEach(en => {
+        if (!en.dead && cl.x < en.x + en.w && cl.x + cl.w > en.x && cl.y < en.y + en.h && cl.y + cl.h > en.y) {
+          this.hitEnemy(en, 1, '#c084fc');
+        }
+      });
+      return true;
+    });
+
     this.particles = this.particles.filter(pt => { pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.12; return --pt.life > 0; });
     this.afterimages = this.afterimages.filter(a => --a.life > 0);
     this.floatingTexts = this.floatingTexts.filter(ft => { ft.y -= 0.6; return --ft.life > 0; });
 
     const targetCam = Math.max(0, Math.min(this.cols * this.TILE - this.canvas.width, p.x - this.canvas.width * 0.38));
     this.cameraX += (targetCam - this.cameraX) * 0.12;
+  }
+
+  // 最終ランク評価: タイム・残HP・最大連鎖・パズル手数の4項目(S=4〜C=1)の平均で決める
+  calcFinalRank() {
+    const timeSec = Math.floor(this.playFrames / 60);
+    const hp = this.player ? this.player.hp : 0;
+    const maxChain = window.puzzles ? puzzles.maxChain : 0;
+    const moves = window.puzzles ? puzzles.moveCount : 0;
+    const rankOf = (v) => v >= 4 ? 'S' : v >= 3 ? 'A' : v >= 2 ? 'B' : 'C';
+    const timeScore = timeSec <= 300 ? 4 : timeSec <= 480 ? 3 : timeSec <= 720 ? 2 : 1;
+    const hpScore = hp >= 5 ? 4 : hp >= 4 ? 3 : hp >= 3 ? 2 : 1;
+    const chainScore = maxChain >= 4 ? 4 : maxChain >= 3 ? 3 : maxChain >= 2 ? 2 : 1;
+    const moveScore = moves <= 80 ? 4 : moves <= 120 ? 3 : moves <= 180 ? 2 : 1;
+    const avg = (timeScore + hpScore + chainScore + moveScore) / 4;
+    const rank = avg >= 3.5 ? 'S' : avg >= 2.5 ? 'A' : avg >= 1.5 ? 'B' : 'C';
+    const mm = String(Math.floor(timeSec / 60)).padStart(2, '0');
+    const ss = String(timeSec % 60).padStart(2, '0');
+    return { rank, timeStr: `${mm}:${ss}`, timeRank: rankOf(timeScore), hpRank: rankOf(hpScore), chainRank: rankOf(chainScore), moveRank: rankOf(moveScore), maxChain, moves, hp };
+  }
+
+  loadHighScore() {
+    try {
+      const raw = localStorage.getItem('psk_highscore_v1');
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  saveHighScore(rank) {
+    try {
+      const prev = this.loadHighScore();
+      const isRecord = !prev || this.score > prev.score;
+      if (isRecord) {
+        localStorage.setItem('psk_highscore_v1', JSON.stringify({ score: this.score, rank, date: new Date().toISOString().slice(0, 10) }));
+      }
+      return { prev, isRecord };
+    } catch (e) { return { prev: null, isRecord: false }; }
   }
 
   winStage() {
@@ -2552,11 +2865,23 @@ class ActionGame {
     sfx.play('win');
     const isLast = this.stageIndex === STAGES.length - 1;
     if (isLast) this.lastTotalScore = this.score;
+    let finalDesc = '';
+    if (isLast) {
+      const r = this.calcFinalRank();
+      const hs = this.saveHighScore(r.rank);
+      const bestLine = hs.isRecord
+        ? `<b style="color:#fde047">🎉 NEW RECORD!</b>`
+        : `ハイスコア: <b>${hs.prev ? hs.prev.score : this.score} pts</b>`;
+      finalDesc =
+        `全ステージ制覇おめでとうございます！<br><b style="color:#7dd3fc">FINAL RESULT</b><br>` +
+        `STAGE 1: ${this.stageScores[0]} pts<br>STAGE 2: ${this.stageScores[1]} pts<br>STAGE 3: ${this.stageScores[2]} pts<br>` +
+        `最終トータルスコア: <b style="color:#fde047;font-size:1.15rem">${this.score} pts</b><br>` +
+        `TIME ${r.timeStr}(${r.timeRank}) ／ HP ${r.hp}/5(${r.hpRank})<br>最大連鎖 ${r.maxChain}(${r.chainRank}) ／ パズル手数 ${r.moves}(${r.moveRank})<br>` +
+        `ランク: <b style="color:#fde047;font-size:1.4rem">${r.rank}</b>　${bestLine}`;
+    }
     document.getElementById('overlayTitle').textContent = isLast ? '🎉 ALL STAGES CLEAR!' : '✨ STAGE CLEAR!';
     document.getElementById('overlayDesc').innerHTML = isLast
-      ? `全ステージ制覇おめでとうございます！<br><b style="color:#7dd3fc">FINAL RESULT</b><br>` +
-        `STAGE 1: ${this.stageScores[0]} pts<br>STAGE 2: ${this.stageScores[1]} pts<br>STAGE 3: ${this.stageScores[2]} pts<br>` +
-        `最終トータルスコア: <b style="color:#fde047;font-size:1.15rem">${this.score} pts</b>`
+      ? finalDesc
       : `${STAGES[this.stageIndex].name} をクリアしました！<br>現在のスコア: <b style="color:#fde047">${this.score} pts</b>`;
     document.getElementById('overlayBtn').textContent = isLast ? '▶ STAGE 1から遊ぶ' : '▶ 次のステージへ';
     document.getElementById('overlayBtnTitle').style.display = isLast ? '' : 'none';
@@ -2781,6 +3106,36 @@ class ActionGame {
         ctx.fillRect(en.x, en.y - 14, en.w, 5);
         ctx.fillStyle = '#fb923c';
         ctx.fillRect(en.x + 1, en.y - 13, (en.w - 2) * (en.hp / en.maxHp), 3);
+      } else if (en.type === 'boss') {
+        // カラーシフト・ボス: 体の色が今のバリア色。金の王冠・HPバー・弱点ラベル付き
+        const bInfo = COLORS[(en.barrier || 1) - 1];
+        const nInfo = COLORS[(en.nextBarrier || 1) - 1];
+        ctx.fillStyle = bInfo.color;
+        ctx.beginPath(); ctx.roundRect(en.x, en.y, en.w, en.h, 8); ctx.fill();
+        ctx.strokeStyle = '#fde047'; ctx.lineWidth = 2;
+        ctx.strokeRect(en.x + 1, en.y + 1, en.w - 2, en.h - 2); ctx.lineWidth = 1;
+        ctx.fillStyle = '#fde047'; ctx.beginPath();
+        ctx.moveTo(en.x + 6, en.y + 2); ctx.lineTo(en.x + 11, en.y - 8); ctx.lineTo(en.x + 16, en.y + 2);
+        ctx.moveTo(en.x + 28, en.y + 2); ctx.lineTo(en.x + 33, en.y - 8); ctx.lineTo(en.x + 38, en.y + 2);
+        ctx.moveTo(en.x + 17, en.y + 2); ctx.lineTo(en.x + 22, en.y - 10); ctx.lineTo(en.x + 27, en.y + 2);
+        ctx.fill();
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(en.x + 10, en.y + 16, 7, 6);
+        ctx.fillRect(en.x + 27, en.y + 16, 7, 6);
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(en.x, en.y - 14, en.w, 6);
+        ctx.fillStyle = bInfo.color;
+        ctx.fillRect(en.x + 1, en.y - 13, (en.w - 2) * (en.hp / en.maxHp), 4);
+        ctx.font = 'bold 11px sans-serif';
+        ctx.fillStyle = '#fff';
+        ctx.fillText(`🛡${bInfo.icon}${bInfo.name}バリア`, en.x - 12, en.y - 30);
+        ctx.font = 'bold 10px sans-serif';
+        ctx.fillStyle = '#cbd5e1';
+        ctx.fillText(`次: ${nInfo.icon}${nInfo.name}`, en.x - 12, en.y - 42);
+        if (en.stunTimer > 0) {
+          ctx.font = 'bold 13px sans-serif';
+          ctx.fillText('💫', en.x + 14, en.y - 56);
+        }
       }
     });
 
@@ -2788,6 +3143,12 @@ class ActionGame {
       ctx.fillStyle = '#34d399';
       ctx.shadowColor = '#34d399'; ctx.shadowBlur = 8;
       ctx.fillRect(pr.x, pr.y, pr.w, pr.h); ctx.shadowBlur = 0;
+    });
+
+    this.enemyShots.forEach(s => {
+      ctx.fillStyle = '#c084fc';
+      ctx.shadowColor = '#c084fc'; ctx.shadowBlur = 10;
+      ctx.beginPath(); ctx.arc(s.x + 4, s.y + 4, 5, 0, Math.PI * 2); ctx.fill(); ctx.shadowBlur = 0;
     });
 
     const p = this.player;
@@ -2827,6 +3188,13 @@ class ActionGame {
       ctx.fillRect(p.dir > 0 ? eyeX + 4 : eyeX + 1, p.y + 7, 3, 3);
     }
 
+    this.clones.forEach(cl => {
+      ctx.globalAlpha = 0.45 + 0.25 * Math.sin(cl.life / 6);
+      ctx.fillStyle = '#c084fc';
+      ctx.beginPath(); ctx.roundRect(cl.x, cl.y, cl.w, cl.h, 6); ctx.fill();
+      ctx.globalAlpha = 1;
+    });
+
     this.particles.forEach(pt => {
       ctx.fillStyle = pt.color; ctx.globalAlpha = Math.min(1, pt.life / 15);
       ctx.fillRect(pt.x, pt.y, pt.size, pt.size); ctx.globalAlpha = 1;
@@ -2842,6 +3210,7 @@ class ActionGame {
   }
 
   loop() {
+    if (this.running) this.playFrames++;
     this.update();
     this.draw();
     requestAnimationFrame(() => this.loop());
