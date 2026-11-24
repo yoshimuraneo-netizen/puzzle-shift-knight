@@ -729,7 +729,7 @@
       <div><b style="color:#38bdf8">💧 青×3</b>：3段跳＆大上昇、上昇中にACTで急降下攻撃(+時間延長)</div>
       <div><b style="color:#34d399">🍀 緑×3</b>：的を起動＆連射レーザー(+時間延長)</div>
       <div><b style="color:#facc15">⚡ 黄×3</b>：電流無効・疾走＆放電バリア(+時間延長)</div>
-      <div><b style="color:#c084fc">🌀 紫×3</b>：壁抜けワープ斬り(+時間延長)</div>
+      <div><b style="color:#c084fc">🌑 紫×3</b>：影潜りでステルス＆すり抜け(+時間延長)</div>
       <div><b style="color:#7dd3fc">💎 隠し</b>：複数色コンボで上空の秘密ルートへ！</div>
       <div><b style="color:#c084fc">👑 カラーシフト・ボス</b>：弱点の色が変わる！同じ色のアクションで大ダメージ＆スタン、違う色は反撃される！</div>
       <div><b style="color:#fde047">🔥 覚醒</b>：4つ以上同時消しで数秒間アクション強化！（5つ消しはさらに長い）</div>
@@ -891,7 +891,7 @@ const COLORS = [
   { id: 1, formId: 2, name: 'スカイ',     icon: '💧', color: '#38bdf8', actionName: '上昇＆スカイダイブ' },
   { id: 2, formId: 3, name: 'シューター', icon: '🍀', color: '#34d399', actionName: '連射レーザー' },
   { id: 3, formId: 4, name: 'エレキ',     icon: '⚡', color: '#facc15', actionName: '疾走＆放電' },
-  { id: 4, formId: 5, name: 'シャドウ',   icon: '🌀', color: '#c084fc', actionName: 'ワープ斬り' }
+  { id: 4, formId: 5, name: 'シャドウ',   icon: '🌑', color: '#c084fc', actionName: '影潜り' }
 ];
 
 /* パズルごとの時間延長ボーナス（揃えた色1色あたり、秒）
@@ -1660,7 +1660,7 @@ class MatchPuzzleManager {
 const STAGES = [
   {
     name: 'STAGE 1: 5色の試練',
-    secretHint: '✨秘密ルート: 💧青で大上昇 → 空中で🔥赤突進 → 🌀紫ワープ！',
+    secretHint: '✨秘密ルート: 💧青で大上昇 → 空中で🔥赤突進 → 🌑紫影潜り！',
     map: [
       '##############################################################################################',
       '#          P           M     R              R             P                   P       M   #',
@@ -1698,7 +1698,7 @@ const STAGES = [
   },
   {
     name: 'STAGE 3: 終焉のコア',
-    secretHint: '✨秘密ルート: 💧青で飛び → 🌀紫ワープ → ⚡黄放電 → 🔥赤突進！',
+    secretHint: '✨秘密ルート: 💧青で飛び → 🌑紫影潜り → ⚡黄放電 → 🔥赤突進！',
     map: [
       '##################################################################################################',
       '#            R           P               M     G  P                   Y       R          M       #',
@@ -1735,7 +1735,6 @@ class ActionGame {
     this.playFrames = 0;
     this.boss = null;
     this.enemyShots = [];
-    this.clones = [];
     this.running = false;
     this.puzzlePaused = false;
     this.puzzleStyle = 1;
@@ -1880,7 +1879,6 @@ class ActionGame {
     this.enemies = [];
     this.boss = null;
     this.enemyShots = [];
-    this.clones = [];
     this.coins = [];
     this.gems = [];
     this.hearts = [];
@@ -1969,6 +1967,7 @@ class ActionGame {
       dashTimer: 0,
       dashPower: 1,
       diveTimer: 0,
+      shadowTimer: 0,
       coyoteTimer: 0,
       jumpBufferTimer: 0,
       zapTimer: 0,
@@ -2021,6 +2020,7 @@ class ActionGame {
     const prev = p.timers[formId];
     p.timers[formId] = Math.min(MAX_FORM_FRAMES, prev + addSeconds * 60);
     p.form = formId;
+    p.shadowTimer = 0;
     p.airSkyGrace = false;
     if (formId === 2 && !p.onGround) {
       p.jumpsLeft = Math.max(p.jumpsLeft, 2);
@@ -2057,6 +2057,7 @@ class ActionGame {
       return;
     }
     p.form = formId;
+    p.shadowTimer = 0;
     if (formId === 2 && !p.onGround) {
       p.jumpsLeft = Math.max(p.jumpsLeft, 2);
     }
@@ -2285,6 +2286,13 @@ class ActionGame {
 
   triggerSpecialAction() {
     const p = this.player;
+    // 影潜り中の再ACTで解除する
+    if (p.form === 5 && p.shadowTimer > 0) {
+      p.shadowTimer = 0;
+      p.actionCd = 18;
+      sfx.play('click');
+      return;
+    }
     if (p.actionCd > 0) return;
 
     if (p.form === 0 || p.timers[p.form] <= 0) {
@@ -2363,38 +2371,15 @@ class ActionGame {
         }
       });
     } else if (p.form === 5) {
-      p.actionCd = Math.round(18 * cdScale);
+      // 紫・シャドウ: 影潜り。数秒間ステルス＆すり抜け状態になる
+      // (敵の接触ダメージ・ボスの弾を無効化、P壁もすり抜ける)
+      // 覚醒中は6秒＆すり抜けざまに敵を斬る
+      const duration = p.awaken[5] > 0 ? 360 : 180;
+      p.shadowTimer = duration;
+      p.actionCd = Math.round(duration * cdScale);
       sfx.play('warp');
-      this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#c084fc', 12);
-      let bestX = p.x;
-      for (let s = 1; s <= 18; s++) {
-        const tx = p.x + p.dir * s * 6;
-        this.afterimages.push({ x: tx, y: p.y, color: '#c084fc', life: 12 });
-        if (!this.collidesRect(tx, p.y, p.w, p.h, true)) {
-          if (!this.collidesRect(tx, p.y, p.w, p.h, false)) bestX = tx;
-        } else break;
-      }
-      // 紫・シャドウ: ワープ斬り。ワープ経路上の敵をすり抜けざまに斬る。
-      const warpFromX = p.x;
-      const warpX0 = Math.min(p.x, bestX);
-      const warpX1 = Math.max(p.x, bestX) + p.w;
-      let slashed = 0;
-      this.enemies.forEach(en => {
-        if (!en.dead && en.x + en.w > warpX0 && en.x < warpX1 &&
-            en.y + en.h > p.y - 6 && en.y < p.y + p.h + 6) {
-          const hpBefore = en.hp;
-          if (this.hitEnemy(en, 1, '#c084fc') && en.hp < hpBefore) slashed++;
-        }
-      });
-      p.x = bestX;
-      if (slashed > 0) this.addFloatingText(p.x - 10, p.y - 16, `🌀 ワープ斬り! ×${slashed}`, '#c084fc');
-      if (p.awaken[5] > 0) {
-        // 覚醒・分身: ワープ前の位置に分身を残し、プレイヤーに長い無敵時間(2秒)を付与
-        this.clones.push({ x: warpFromX, y: p.y, w: p.w, h: p.h, life: 180 });
-        p.invuln = Math.max(p.invuln, 120);
-        this.addFloatingText(p.x - 10, p.y - 16, '🌀 分身出現！無敵2秒', '#c084fc');
-      }
-      this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#e9d5ff', 14);
+      this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#c084fc', 14);
+      this.addFloatingText(p.x - 10, p.y - 16, p.awaken[5] > 0 ? '🌑 覚醒影潜り！すり抜け斬り！' : '🌑 影潜り！', '#c084fc');
     }
   }
 
@@ -2464,7 +2449,7 @@ class ActionGame {
         this.addFloatingText(p.x - 35, p.y - 16, '⚡ 黄の放電でコイルを起動！', '#facc15');
         p.hintCd = 90;
       } else if (ch === 'P' && p.form !== 5) {
-        this.addFloatingText(p.x - 35, p.y - 16, '🌀 紫の瞬間ワープですり抜け！', '#c084fc');
+        this.addFloatingText(p.x - 35, p.y - 16, '🌑 紫の影潜りですり抜け！', '#c084fc');
         p.hintCd = 90;
       } else if (ch === 'M') {
         const g = this.enemyGates.find(gt => gt.col === frontCol);
@@ -2512,6 +2497,7 @@ class ActionGame {
       p.timers[p.form] -= dtFrames;
       if (p.timers[p.form] <= 0) {
         p.timers[p.form] = 0;
+        p.shadowTimer = 0;
         const expiredForm = p.form;
         const cInfo = COLORS[expiredForm - 1];
         this.addFloatingText(p.x - 10, p.y - 16, `${cInfo.icon}${cInfo.name} 時間切れ!`, '#94a3b8');
@@ -2535,6 +2521,10 @@ class ActionGame {
     this.updateSlotTimersOnly();
 
     if (p.invuln > 0) p.invuln--;
+    if (p.shadowTimer > 0) {
+      p.shadowTimer -= dtFrames;
+      if (p.shadowTimer < 0) p.shadowTimer = 0;
+    }
     if (p.actionCd > 0) p.actionCd--;
     if (p.zapTimer > 0) p.zapTimer--;
     if (p.hintCd > 0) p.hintCd--;
@@ -2642,7 +2632,7 @@ class ActionGame {
         }
       }
     }
-    if (this.collidesRect(p.x, p.y, p.w, p.h)) {
+    if (this.collidesRect(p.x, p.y, p.w, p.h, p.shadowTimer > 0)) {
       this.checkGimmickHint();
       if (p.vx > 0) p.x = Math.floor((p.x + p.w - 0.01) / this.TILE) * this.TILE - p.w - 0.01;
       else if (p.vx < 0) p.x = (Math.floor(p.x / this.TILE) + 1) * this.TILE + 0.01;
@@ -2668,7 +2658,7 @@ class ActionGame {
         }
       }
     }
-    if (this.collidesRect(p.x, p.y, p.w, p.h)) {
+    if (this.collidesRect(p.x, p.y, p.w, p.h, p.shadowTimer > 0)) {
       if (p.vy > 0) {
         p.y = Math.floor((p.y + p.h - 0.01) / this.TILE) * this.TILE - p.h - 0.01;
         p.vy = 0; p.onGround = true; p.airSkyGrace = false;
@@ -2853,6 +2843,9 @@ class ActionGame {
           this.hitEnemy(en, 1, '#38bdf8');
           p.vy = -6.2;
           p.diveTimer = 0;
+        } else if (p.shadowTimer > 0) {
+          // 影潜り中は敵をすり抜ける(被弾しない)。覚醒中はすり抜けざまに斬る
+          if (p.form === 5 && p.awaken[5] > 0) this.hitEnemy(en, 1, '#c084fc');
         } else if (en.type !== 'knight' && en.type !== 'guardian' && en.type !== 'boss' && p.vy > 0 && p.y + p.h - p.vy <= en.y + 10) {
           this.hitEnemy(en, 1, '#a3e635');
           p.vy = -5.8;
@@ -2929,24 +2922,12 @@ class ActionGame {
       const s = this.enemyShots[i];
       s.x += s.vx; s.y += s.vy; s.life--;
       let remove = s.life <= 0 || this.collidesRect(s.x, s.y, 8, 8);
-      if (!remove && p.x < s.x + 8 && p.x + p.w > s.x && p.y < s.y + 8 && p.y + p.h > s.y) {
+      if (!remove && p.shadowTimer <= 0 && p.x < s.x + 8 && p.x + p.w > s.x && p.y < s.y + 8 && p.y + p.h > s.y) {
         this.damagePlayer(1);
         remove = true;
       }
       if (remove) this.enemyShots.splice(i, 1);
     }
-
-    // 分身: 触れた敵にダメージを与えながら3秒で消える
-    this.clones = this.clones.filter(cl => {
-      cl.life--;
-      if (cl.life <= 0) return false;
-      this.enemies.forEach(en => {
-        if (!en.dead && cl.x < en.x + en.w && cl.x + cl.w > en.x && cl.y < en.y + en.h && cl.y + cl.h > en.y) {
-          this.hitEnemy(en, 1, '#c084fc');
-        }
-      });
-      return true;
-    });
 
     this.particles = this.particles.filter(pt => { pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.12; return --pt.life > 0; });
     this.afterimages = this.afterimages.filter(a => --a.life > 0);
@@ -3302,6 +3283,8 @@ class ActionGame {
 
     const p = this.player;
     if (p.invuln % 6 < 4) {
+      // 影潜り中は半透明になる
+      if (p.shadowTimer > 0) ctx.globalAlpha = 0.45;
       const bodyColor = p.form === 0 ? '#cbd5e1' : COLORS[p.form - 1].color;
       if (p.zapTimer > 0) {
         ctx.strokeStyle = '#facc15'; ctx.lineWidth = 3;
@@ -3335,14 +3318,13 @@ class ActionGame {
       ctx.fillRect(eyeX, p.y + 6, 8, 5);
       ctx.fillStyle = '#fff';
       ctx.fillRect(p.dir > 0 ? eyeX + 4 : eyeX + 1, p.y + 7, 3, 3);
-    }
-
-    this.clones.forEach(cl => {
-      ctx.globalAlpha = 0.45 + 0.25 * Math.sin(cl.life / 6);
-      ctx.fillStyle = '#c084fc';
-      ctx.beginPath(); ctx.roundRect(cl.x, cl.y, cl.w, cl.h, 6); ctx.fill();
+      if (p.shadowTimer > 0) {
+        ctx.font = 'bold 12px sans-serif';
+        ctx.fillStyle = '#c084fc';
+        ctx.fillText('🌑', p.x + 4, p.y - 6);
+      }
       ctx.globalAlpha = 1;
-    });
+    }
 
     this.particles.forEach(pt => {
       ctx.fillStyle = pt.color; ctx.globalAlpha = Math.min(1, pt.life / 15);
