@@ -2073,7 +2073,7 @@ class ActionGame {
       const frames = this.player.timers[fid];
       const ready = frames > 0;
       const active = this.player.form === fid;
-      const secText = ready ? (frames / 60).toFixed(1) + 's' : '🔒0.0s';
+      const secText = ready ? Math.ceil(frames / 60) + 's' : '🔒0s';
       const pct = Math.min(100, (frames / (60 * 24)) * 100);
 
       const slot = document.createElement('div');
@@ -2087,7 +2087,7 @@ class ActionGame {
         <div class="f-icon">${cInfo.icon}</div>
         <div class="f-name" style="color:${ready ? cInfo.color : '#64748b'}">${cInfo.name}</div>
         <div class="f-act">${cInfo.actionName}</div>
-        <div class="awaken-badge" id="slotAwaken${fid}" style="display:${awakened ? 'block' : 'none'}">🔥覚醒 ${(this.player.awaken[fid] / 60).toFixed(1)}s</div>
+        <div class="awaken-badge" id="slotAwaken${fid}" style="display:${awakened ? 'block' : 'none'}">🔥覚醒 ${Math.ceil(this.player.awaken[fid] / 60)}s</div>
         <div class="time-bar-track"><div class="time-bar-fill" id="slotBar${fid}" style="width:${pct}%; background:${cInfo.color}"></div></div>
       `;
       slot.onclick = () => this.switchForm(fid);
@@ -2102,7 +2102,7 @@ class ActionGame {
       const timeEl = document.getElementById(`slotTime${fid}`);
       const barEl = document.getElementById(`slotBar${fid}`);
       if (timeEl) {
-        const text = frames > 0 ? (frames / 60).toFixed(1) + 's' : '🔒0.0s';
+        const text = frames > 0 ? Math.ceil(frames / 60) + 's' : '🔒0s';
         if (timeEl.textContent !== text) timeEl.textContent = text;
       }
       if (barEl) {
@@ -2114,7 +2114,7 @@ class ActionGame {
       const slotEl = document.getElementById(`formSlot${fid}`);
       if (awEl) {
         awEl.style.display = aw > 0 ? 'block' : 'none';
-        const text = `🔥覚醒 ${(aw / 60).toFixed(1)}s`;
+        const text = `🔥覚醒 ${Math.ceil(aw / 60)}s`;
         if (awEl.textContent !== text) awEl.textContent = text;
       }
       if (slotEl) slotEl.classList.toggle('awakened', aw > 0);
@@ -2143,7 +2143,7 @@ class ActionGame {
       }
     } else {
       const cInfo = COLORS[p.form - 1];
-      const sec = (p.timers[p.form] / 60).toFixed(1);
+      const sec = Math.ceil(p.timers[p.form] / 60);
       nextText = `${cInfo.icon} ${cInfo.name}${p.awaken[p.form] > 0 ? ' 🔥覚醒' : ''} (${sec}s)`;
       if (force || this._lastFormBadgeText !== nextText) {
         badge.textContent = nextText;
@@ -2504,13 +2504,14 @@ class ActionGame {
     }
   }
 
-  update() {
+  update(dtFrames = 1) {
     if (!this.running || this.puzzlePaused) return;
     const p = this.player;
 
     if (p.form !== 0 && p.timers[p.form] > 0) {
-      p.timers[p.form]--;
-      if (p.timers[p.form] === 0) {
+      p.timers[p.form] -= dtFrames;
+      if (p.timers[p.form] <= 0) {
+        p.timers[p.form] = 0;
         const expiredForm = p.form;
         const cInfo = COLORS[expiredForm - 1];
         this.addFloatingText(p.x - 10, p.y - 16, `${cInfo.icon}${cInfo.name} 時間切れ!`, '#94a3b8');
@@ -2527,8 +2528,8 @@ class ActionGame {
     // 覚醒タイマーを減らす(切れたらフォームバーを更新)
     for (let fid = 1; fid <= 5; fid++) {
       if (p.awaken[fid] > 0) {
-        p.awaken[fid]--;
-        if (p.awaken[fid] === 0) this.renderFormBar();
+        p.awaken[fid] -= dtFrames;
+        if (p.awaken[fid] <= 0) { p.awaken[fid] = 0; this.renderFormBar(); }
       }
     }
     this.updateSlotTimersOnly();
@@ -3358,8 +3359,13 @@ class ActionGame {
   }
 
   loop() {
-    if (this.running) this.playFrames++;
-    this.update();
+    const now = Date.now();
+    const dtMs = this.lastFrameTime ? now - this.lastFrameTime : 1000 / 60;
+    this.lastFrameTime = now;
+    // 実時間ベース: 60fps換算の経過フレーム数(カクつき・タブ復帰の暴走を防ぐため最大6フレーム)
+    const dtFrames = Math.max(0, Math.min(dtMs / (1000 / 60), 6));
+    if (this.running) this.playFrames += dtFrames;
+    this.update(dtFrames);
     this.draw();
     requestAnimationFrame(() => this.loop());
   }
