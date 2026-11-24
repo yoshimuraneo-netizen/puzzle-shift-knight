@@ -1092,6 +1092,44 @@ class MatchPuzzleManager {
     this.renderBoard();
   }
 
+  // ステージクリア後: 全盤面に残っているお邪魔ブロックを掃除する
+  clearAllJunk() {
+    let cleared = 0;
+    for (let m = 1; m <= 5; m++) {
+      const b = this.boards[m];
+      for (let r = 0; r < this.N; r++) {
+        for (let c = 0; c < this.N; c++) {
+          if (b[r][c] !== JUNK) continue;
+          b[r][c] = this.pickSafeColor(b, r, c);
+          cleared++;
+        }
+      }
+    }
+    if (cleared > 0) {
+      this.triggerFullDrop();
+      this.renderBoard();
+      this.showToast(`🧹 お邪魔ブロック ${cleared}個を掃除！`, '#4ade80');
+    }
+    return cleared;
+  }
+
+  // (r,c)に置いても3つ揃いを作らない色を選ぶ
+  pickSafeColor(b, r, c) {
+    const at = (rr, cc) => (rr >= 0 && rr < this.N && cc >= 0 && cc < this.N) ? b[rr][cc] : -9;
+    const completes = (col) => {
+      const pairs = [
+        [[r, c - 1], [r, c - 2]], [[r, c - 1], [r, c + 1]], [[r, c + 1], [r, c + 2]],
+        [[r - 1, c], [r - 2, c]], [[r - 1, c], [r + 1, c]], [[r + 1, c], [r + 2, c]],
+      ];
+      return pairs.some(([p1, p2]) => at(p1[0], p1[1]) === col && at(p2[0], p2[1]) === col);
+    };
+    for (let t = 0; t < 10; t++) {
+      const col = Math.floor(Math.random() * 5);
+      if (!completes(col)) return col;
+    }
+    return Math.floor(Math.random() * 5);
+  }
+
   isFrozen(r, c) {
     const s = this.frozen[this.mode];
     return !!s && s.has(`${r},${c}`);
@@ -2978,6 +3016,8 @@ class ActionGame {
     this.stageCleared = true;
     this.setPuzzlePaused(false);
     if (window.puzzles) puzzles.setActive(false);
+    // クリア後に残っているお邪魔ブロックは全部消す(次のステージはきれいな盤面から)
+    if (window.puzzles) puzzles.clearAllJunk();
     this.score += 500;
     // このステージで稼いだスコア(クリアボーナス500含む)を記録する
     this.stageScores[this.stageIndex] = this.score - this.stageStartScore;
