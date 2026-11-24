@@ -1333,9 +1333,9 @@ class MatchPuzzleManager {
         const cInfo = COLORS[col];
         game.extendColorTime(cInfo.formId, addSec);
         msgs.push(`${cInfo.icon}${cInfo.name} +${addSec}秒`);
-        // 4つ以上同時消し: 数秒間の覚醒状態を付与(4消し5秒・5消し8秒)
+        // 4つ以上同時消し: 数秒間の覚醒状態を付与(4消し10秒・5消し15秒)
         if (cnt >= 4) {
-          game.awakenColor(cInfo.formId, cnt >= 5 ? 480 : 300);
+          game.awakenColor(cInfo.formId, cnt >= 5 ? 900 : 600);
           msgs.push(`🔥${cInfo.name}覚醒！`);
         }
       }
