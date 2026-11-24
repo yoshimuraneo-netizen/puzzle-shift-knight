@@ -491,6 +491,18 @@
     transform: scale(1.08);
     z-index: 2;
   }
+  .gem-cell.frozen {
+    cursor: not-allowed;
+    filter: brightness(1.25) saturate(0.5);
+    box-shadow: inset 0 0 0 3px #7dd3fc, 0 0 10px rgba(125, 211, 252, 0.8);
+  }
+  .gem-cell.frozen::after {
+    content: '❄️';
+    position: absolute;
+    top: -7px;
+    right: -5px;
+    font-size: 0.8rem;
+  }
   .gem-cell.movable {
     box-shadow: inset 0 0 0 2px #fff, 0 0 10px rgba(255,255,255,0.4);
   }
@@ -721,6 +733,7 @@
       <div><b style="color:#7dd3fc">💎 隠し</b>：複数色コンボで上空の秘密ルートへ！</div>
       <div><b style="color:#c084fc">👑 カラーシフト・ボス</b>：弱点の色が変わる！同じ色のアクションで大ダメージ＆スタン、違う色は反撃される！</div>
       <div><b style="color:#fde047">🔥 覚醒</b>：4つ以上同時消しで数秒間アクション強化！（5つ消しはさらに長い）</div>
+      <div><b style="color:#7dd3fc">🧊 氷結</b>：ガーディアンやボスがパズルを凍らせる。アクションの攻撃を当てると1マスずつ解凍！</div>
     </div>
   </section>
 </div>
@@ -945,6 +958,9 @@ class MatchPuzzleManager {
     this.dropMap = null;
     this.maxChain = 0;
     this.moveCount = 0;
+    // 凍結中のマス(盤面ごと): 動かせず・揃わず・落ちない
+    this.frozen = {};
+    for (let m = 1; m <= 5; m++) this.frozen[m] = new Set();
 
     for (let m = 1; m <= 5; m++) {
       this.boards[m] = this.createInitialBoard(m, 0);
@@ -1006,7 +1022,7 @@ class MatchPuzzleManager {
         const candidates = [];
         for (let r = 0; r < this.N; r++) {
           for (let c = 0; c < this.N; c++) {
-            if (b[r][c] >= 0) candidates.push([r, c]);
+            if (b[r][c] >= 0 && !this.frozen[m].has(`${r},${c}`)) candidates.push([r, c]);
           }
         }
         if (!candidates.length) break;
@@ -1017,7 +1033,7 @@ class MatchPuzzleManager {
           addedOnCurrent++;
         }
       }
-      if (m === 1 && !this.hasValidSwapMove(b)) {
+      if (m === 1 && !this.hasValidSwapMove(b, 1)) {
         this.boards[1] = this.createInitialBoard(1, this.countJunk(b));
       }
     }
@@ -1048,7 +1064,7 @@ class MatchPuzzleManager {
         const candidates = [];
         for (let r = 0; r < this.N; r++) {
           for (let c = 0; c < this.N; c++) {
-            if (b[r][c] >= 0) candidates.push([r, c]);
+            if (b[r][c] >= 0 && !this.frozen[m].has(`${r},${c}`)) candidates.push([r, c]);
           }
         }
         if (!candidates.length) break;
@@ -1059,7 +1075,7 @@ class MatchPuzzleManager {
           addedOnCurrent++;
         }
       }
-      if (m === 1 && !this.hasValidSwapMove(b)) {
+      if (m === 1 && !this.hasValidSwapMove(b, 1)) {
         this.boards[1] = this.createInitialBoard(1, this.countJunk(b));
       }
     }
@@ -1076,8 +1092,54 @@ class MatchPuzzleManager {
     this.renderBoard();
   }
 
+  isFrozen(r, c) {
+    const s = this.frozen[this.mode];
+    return !!s && s.has(`${r},${c}`);
+  }
+
+  // 氷結攻撃: 今の盤面のランダムな2マスを凍らせる
+  freezeRandomCells(count = 2) {
+    if (!this.active) return 0;
+    const b = this.boards[this.mode];
+    const candidates = [];
+    for (let r = 0; r < this.N; r++)
+      for (let c = 0; c < this.N; c++)
+        if (b[r][c] >= 0 && !this.frozen[this.mode].has(`${r},${c}`)) candidates.push([r, c]);
+    let frozen = 0;
+    while (candidates.length && frozen < count) {
+      const i = Math.floor(Math.random() * candidates.length);
+      const [r, c] = candidates.splice(i, 1)[0];
+      this.frozen[this.mode].add(`${r},${c}`);
+      frozen++;
+    }
+    if (frozen > 0) {
+      this.showToast(`🧊 パズルが${frozen}マス凍った！攻撃を当てて解凍！`, '#7dd3fc');
+      this.renderBoard();
+    }
+    return frozen;
+  }
+
+  // 解凍: アクション側の攻撃が1回当たるごとに1マス解ける(今の盤面を優先)
+  thawOne() {
+    const order = [this.mode, 1, 2, 3, 4, 5].filter((v, i, a) => a.indexOf(v) === i);
+    for (const m of order) {
+      const set = this.frozen[m];
+      if (set && set.size > 0) {
+        const arr = [...set];
+        const key = arr[Math.floor(Math.random() * arr.length)];
+        set.delete(key);
+        this.showToast('🧊 解凍！', '#7dd3fc');
+        this.renderBoard();
+        return true;
+      }
+    }
+    return false;
+  }
+
   createInitialBoard(mode, junkCount = 0) {
     let b;
+    // 盤面を作り直すときは凍結も解ける
+    if (this.frozen) this.frozen[mode] = new Set();
     const maxJunk = Math.min(junkCount, 8);
     for (let attempt = 0; attempt < 90; attempt++) {
       b = Array.from({ length: this.N }, () =>
@@ -1108,7 +1170,7 @@ class MatchPuzzleManager {
           }
         }
       }
-      if (mode !== 1 || this.hasValidSwapMove(b)) break;
+      if (mode !== 1 || this.hasValidSwapMove(b, mode)) break;
     }
     return b;
   }
@@ -1126,11 +1188,12 @@ class MatchPuzzleManager {
     return Math.floor(Math.random() * 5);
   }
 
-  hasValidSwapMove(b) {
+  hasValidSwapMove(b, mode = this.mode) {
     const test = (r1, c1, r2, c2) => {
       if (b[r1][c1] < 0 || b[r2][c2] < 0) return false;
+      if (this.frozen[mode].has(`${r1},${c1}`) || this.frozen[mode].has(`${r2},${c2}`)) return false;
       [b[r1][c1], b[r2][c2]] = [b[r2][c2], b[r1][c1]];
-      const ok = this.findMatches(b).matchedCells.size > 0;
+      const ok = this.findMatches(b, mode).matchedCells.size > 0;
       [b[r1][c1], b[r2][c2]] = [b[r2][c2], b[r1][c1]];
       return ok;
     };
@@ -1143,18 +1206,19 @@ class MatchPuzzleManager {
     return false;
   }
 
-  findMatches(b) {
+  findMatches(b, mode = this.mode) {
     const matchedCells = new Set();
     const adjacentJunk = new Set();
     const colorCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0 };
+    const frozenSet = this.frozen[mode] || new Set();
 
     for (let r = 0; r < this.N; r++) {
       let c = 0;
       while (c < this.N) {
         const val = b[r][c];
-        if (val < 0) { c++; continue; }
+        if (val < 0 || frozenSet.has(`${r},${c}`)) { c++; continue; }
         let len = 1;
-        while (c + len < this.N && b[r][c + len] === val) len++;
+        while (c + len < this.N && b[r][c + len] === val && !frozenSet.has(`${r},${c + len}`)) len++;
         if (len >= 3) for (let k = 0; k < len; k++) matchedCells.add(`${r},${c + k}`);
         c += len;
       }
@@ -1163,9 +1227,9 @@ class MatchPuzzleManager {
       let r = 0;
       while (r < this.N) {
         const val = b[r][c];
-        if (val < 0) { r++; continue; }
+        if (val < 0 || frozenSet.has(`${r},${c}`)) { r++; continue; }
         let len = 1;
-        while (r + len < this.N && b[r + len][c] === val) len++;
+        while (r + len < this.N && b[r + len][c] === val && !frozenSet.has(`${r + len},${c}`)) len++;
         if (len >= 3) for (let k = 0; k < len; k++) matchedCells.add(`${r + k},${c}`);
         r += len;
       }
@@ -1297,13 +1361,15 @@ class MatchPuzzleManager {
 
       const drops = Array.from({ length: this.N }, () => Array(this.N).fill(0));
       for (let c = 0; c < this.N; c++) {
+        // 凍ったマスはその場に固定され、他のマスだけがその周りを落ちる
         const survivors = [];
         for (let r = this.N - 1; r >= 0; r--) {
-          if (b[r][c] !== -2) survivors.push({ val: b[r][c], oldR: r });
+          if (b[r][c] !== -2 && !this.isFrozen(r, c)) survivors.push({ val: b[r][c], oldR: r });
         }
         let spawnIdx = 1;
+        let sIdx = 0;
         for (let r = this.N - 1; r >= 0; r--) {
-          const sIdx = this.N - 1 - r;
+          if (this.isFrozen(r, c)) { drops[r][c] = 0; continue; }
           if (sIdx < survivors.length) {
             b[r][c] = survivors[sIdx].val;
             drops[r][c] = r - survivors[sIdx].oldR;
@@ -1312,6 +1378,7 @@ class MatchPuzzleManager {
             drops[r][c] = r - (-spawnIdx);
             spawnIdx++;
           }
+          sIdx++;
         }
       }
       this.dropMap = drops;
@@ -1327,7 +1394,7 @@ class MatchPuzzleManager {
     const b = this.boards[this.mode];
 
     if (this.mode === 1) {
-      if (b[r][c] < 0) {
+      if (b[r][c] < 0 || this.isFrozen(r, c)) {
         sfx.play('hit');
         const cells = document.querySelectorAll('.gem-cell');
         if (cells[r * 5 + c]) cells[r * 5 + c].classList.add('invalid');
@@ -1365,7 +1432,7 @@ class MatchPuzzleManager {
         this.renderBoard();
       }
     } else if (this.mode === 2) {
-      if (b[r][c] === -1) return;
+      if (b[r][c] === -1 || this.isFrozen(r, c)) return;
       let er = -1, ec = -1;
       for (let rr = 0; rr < this.N; rr++)
         for (let cc = 0; cc < this.N; cc++)
@@ -1386,7 +1453,7 @@ class MatchPuzzleManager {
       }
       [[0,0],[-1,0],[1,0],[0,-1],[0,1]].forEach(([dr, dc]) => {
         const nr = r + dr, nc = c + dc;
-        if (nr >= 0 && nr < this.N && nc >= 0 && nc < this.N && b[nr][nc] >= 0) {
+        if (nr >= 0 && nr < this.N && nc >= 0 && nc < this.N && b[nr][nc] >= 0 && !this.isFrozen(nr, nc)) {
           b[nr][nc] = (b[nr][nc] + 1) % 5;
         }
       });
@@ -1398,6 +1465,11 @@ class MatchPuzzleManager {
 
   handleRotate2x2(r, c) {
     if (!this.active || this.busy) return;
+    if ([[r, c], [r + 1, c], [r + 1, c + 1], [r, c + 1]].some(([rr, cc]) => this.isFrozen(rr, cc))) {
+      sfx.play('hit');
+      this.showToast('🧊 凍っているため回せない！', '#7dd3fc');
+      return;
+    }
     if (window.game && game.running) game.setPuzzlePaused(true);
     const b = this.boards[3];
     const tmp = b[r][c];
@@ -1412,6 +1484,14 @@ class MatchPuzzleManager {
 
   handleShift(type, idx, dir) {
     if (!this.active || this.busy) return;
+    const hasFrozen = type === 'row'
+      ? Array.from({ length: this.N }, (_, cc) => this.isFrozen(idx, cc)).some(Boolean)
+      : Array.from({ length: this.N }, (_, rr) => this.isFrozen(rr, idx)).some(Boolean);
+    if (hasFrozen) {
+      sfx.play('hit');
+      this.showToast('🧊 凍っているため動かせない！', '#7dd3fc');
+      return;
+    }
     if (window.game && game.running) game.setPuzzlePaused(true);
     const b = this.boards[4];
     if (type === 'row') {
@@ -1476,13 +1556,16 @@ class MatchPuzzleManager {
           } else {
             const isSel = this.selected && this.selected[0] === r && this.selected[1] === c;
             const isMov = this.mode === 2 && Math.abs(r - er) + Math.abs(c - ec) === 1;
+            const isFrz = this.isFrozen(r, c);
             cell.className = `gem-cell gem-${val}`
               + (isSel ? ' selected' : '')
               + (isMov ? ' movable' : '')
               + (isPop ? ' popping' : '')
+              + (isFrz ? ' frozen' : '')
               + (dropRows > 0 ? ' dropping' : '');
             if (dropRows > 0) cell.style.setProperty('--drop-y', `${-dropRows * 53}px`);
             cell.textContent = COLORS[val].icon;
+            if (isFrz) cell.title = '凍結中：アクションの攻撃を当てて解凍！';
             cell.onclick = () => this.handleCellClick(r, c);
           }
           grid.appendChild(cell);
@@ -1837,13 +1920,13 @@ class ActionGame {
         else if (ch === 'E') this.enemies.push({ type: 'slime', col: c, x: wx + 4, y: wy + 8, w: 24, h: 24, vx: 0.9, hp: 1, maxHp: 1, hitCd: 0 });
         else if (ch === 'K') this.enemies.push({ type: 'knight', col: c, x: wx + 3, y: wy + 4, w: 26, h: 28, vx: -0.75, hp: 1, maxHp: 1, hitCd: 0 });
         else if (ch === 'F') this.enemies.push({ type: 'drone', col: c, x: wx + 4, y: wy + 4, baseY: wy + 4, w: 24, h: 22, vx: 1.1, t: Math.random() * 6, hp: 1, maxHp: 1, hitCd: 0 });
-        else if (ch === 'W') this.enemies.push({ type: 'guardian', col: c, x: wx, y: wy - 4, w: 32, h: 36, vx: -0.65, hp: 3, maxHp: 3, hitCd: 0 });
+        else if (ch === 'W') this.enemies.push({ type: 'guardian', col: c, x: wx, y: wy - 4, w: 32, h: 36, vx: -0.65, hp: 3, maxHp: 3, hitCd: 0, freezeCd: 600, charging: 0 });
         else if (ch === 'Q') {
           // ステージ3終盤のカラーシフト・ボス(HP10・4秒ごとに弱点の色が変わる)
           const b0 = 1 + Math.floor(Math.random() * 5);
           let b1 = 1 + Math.floor(Math.random() * 5);
           while (b1 === b0) b1 = 1 + Math.floor(Math.random() * 5);
-          const boss = { type: 'boss', col: c, x: wx - 6, y: wy - 12, w: 44, h: 44, vx: 0.6, hp: 10, maxHp: 10, hitCd: 0, activated: false, rainCd: 0, shootCd: 0, barrier: b0, nextBarrier: b1, barrierTimer: 240, stunTimer: 0, counterCd: 0 };
+          const boss = { type: 'boss', col: c, x: wx - 6, y: wy - 12, w: 44, h: 44, vx: 0.6, hp: 10, maxHp: 10, hitCd: 0, activated: false, rainCd: 0, shootCd: 0, barrier: b0, nextBarrier: b1, barrierTimer: 240, stunTimer: 0, counterCd: 0, freezeCd: 600, charging: 0 };
           this.enemies.push(boss);
           this.boss = boss;
         }
@@ -1948,6 +2031,11 @@ class ActionGame {
     this.addFloatingText(p.x - 10, p.y - 16, `${cInfo.icon}${cInfo.name} +${addSeconds}秒!`, cInfo.color);
     this.renderFormBar();
     this.updateHUD(true);
+  }
+
+  // 解凍: アクション側の攻撃が1回当たるごとに凍ったマスが1つ解ける
+  thawFrozenCell() {
+    if (window.puzzles) puzzles.thawOne();
   }
 
   // 覚醒: 指定色のアクションを数秒間強化する
@@ -2105,6 +2193,12 @@ class ActionGame {
         // 同色: 大ダメージ(3)＆スタン(2秒)
         en.hp -= 3;
         en.stunTimer = 120;
+        if (en.charging > 0) {
+          en.charging = 0;
+          en.freezeCd = 720;
+          this.addFloatingText(en.x - 10, en.y - 12, '💥 溜めを阻止！', '#7dd3fc');
+        }
+        this.thawFrozenCell();
         if (en.hp <= 0) {
           en.dead = true;
           this.score += 1000;
@@ -2130,6 +2224,14 @@ class ActionGame {
     }
     en.hp -= dmg;
     en.hitCd = 16;
+    // 溜め攻撃を中断する(ガーディアンの氷結溜めなど)
+    if (en.charging > 0) {
+      en.charging = 0;
+      if (en.type === 'guardian') en.freezeCd = 720;
+      this.addFloatingText(en.x - 10, en.y - 12, '💥 溜めを阻止！', '#7dd3fc');
+    }
+    // 攻撃が当たるごとに凍ったマスが1つ解ける
+    this.thawFrozenCell();
     if (en.hp <= 0) {
       en.dead = true;
       this.score += en.type === 'boss' ? 1000 : en.type === 'guardian' ? 300 : 100;
@@ -2708,11 +2810,31 @@ class ActionGame {
       if (en.dead) { this.enemies.splice(i, 1); continue; }
       if (en.hitCd > 0) en.hitCd--;
 
+      // ガーディアンの氷結溜め攻撃(プレイヤーが近いときだけ溜め始める)
+      if (en.type === 'guardian' && Math.abs(p.x - en.x) < 500) {
+        if (en.charging > 0) {
+          en.charging--;
+          if (en.charging === 0) {
+            if (window.puzzles) puzzles.freezeRandomCells(2);
+            this.addFloatingText(en.x - 10, en.y - 14, '🧊 氷結攻撃！', '#7dd3fc');
+            en.freezeCd = 720;
+          }
+        } else if (en.freezeCd > 0) {
+          en.freezeCd--;
+          if (en.freezeCd === 0) {
+            en.charging = 90;
+            this.addFloatingText(en.x - 10, en.y - 14, '❄️ 氷結を溜めている！', '#7dd3fc');
+            sfx.play('zap');
+          }
+        }
+      }
+
       if (en.type === 'drone') {
         en.t += 0.05; en.x += en.vx; en.y = en.baseY + Math.sin(en.t) * 14;
         if (this.collidesRect(en.x, en.y, en.w, en.h)) en.vx *= -1;
-      } else if (en.type === 'boss' && en.stunTimer > 0) {
-        // スタン中のボスは動かない
+      } else if ((en.type === 'boss' && (en.stunTimer > 0 || en.charging > 0)) ||
+                 (en.type === 'guardian' && en.charging > 0)) {
+        // スタン中・溜め中の敵は動かない
       } else {
         en.x += en.vx;
         const fx = en.vx > 0 ? en.x + en.w + 2 : en.x - 2;
@@ -2781,6 +2903,22 @@ class ActionGame {
           const cInfo = COLORS[boss.barrier - 1];
           this.addFloatingText(boss.x - 20, boss.y - 18, `🛡 バリア変化！今は${cInfo.icon}${cInfo.name}！`, cInfo.color);
           sfx.play('zap');
+        }
+        // ボスの氷結溜め攻撃(2秒の予告のあとパズルを2マス凍らせる)
+        if (boss.charging > 0) {
+          boss.charging--;
+          if (boss.charging === 0) {
+            if (window.puzzles) puzzles.freezeRandomCells(2);
+            this.addFloatingText(boss.x - 30, boss.y - 18, '🧊 氷結攻撃！', '#7dd3fc');
+            boss.freezeCd = 720;
+          }
+        } else if (boss.freezeCd > 0) {
+          boss.freezeCd--;
+          if (boss.freezeCd === 0) {
+            boss.charging = 120;
+            this.addFloatingText(boss.x - 30, boss.y - 18, '❄️ ボスが氷結を溜めている！', '#7dd3fc');
+            sfx.play('zap');
+          }
         }
       }
     }
@@ -3106,6 +3244,11 @@ class ActionGame {
         ctx.fillRect(en.x, en.y - 14, en.w, 5);
         ctx.fillStyle = '#fb923c';
         ctx.fillRect(en.x + 1, en.y - 13, (en.w - 2) * (en.hp / en.maxHp), 3);
+        if (en.charging > 0) {
+          ctx.font = 'bold 12px sans-serif';
+          ctx.fillStyle = '#7dd3fc';
+          ctx.fillText('❄️', en.x + 8, en.y - 18);
+        }
       } else if (en.type === 'boss') {
         // カラーシフト・ボス: 体の色が今のバリア色。金の王冠・HPバー・弱点ラベル付き
         const bInfo = COLORS[(en.barrier || 1) - 1];
@@ -3134,7 +3277,12 @@ class ActionGame {
         ctx.fillText(`次: ${nInfo.icon}${nInfo.name}`, en.x - 12, en.y - 42);
         if (en.stunTimer > 0) {
           ctx.font = 'bold 13px sans-serif';
-          ctx.fillText('💫', en.x + 14, en.y - 56);
+          ctx.fillText('💫', en.x + 14, en.y - 68);
+        }
+        if (en.charging > 0) {
+          ctx.font = 'bold 11px sans-serif';
+          ctx.fillStyle = '#7dd3fc';
+          ctx.fillText('❄️氷結溜め中！', en.x - 12, en.y - 56);
         }
       }
     });
