@@ -2549,12 +2549,10 @@ class ActionGame {
       }
     }
 
-    // 覚醒タイマーを減らす(切れたらフォームバーを更新)
-    for (let fid = 1; fid <= 5; fid++) {
-      if (p.awaken[fid] > 0) {
-        p.awaken[fid] -= dtFrames;
-        if (p.awaken[fid] <= 0) { p.awaken[fid] = 0; this.renderFormBar(); }
-      }
+    // 覚醒タイマーは今選んでいるフォームのものだけ減る(選んでいない色は止まったまま)
+    if (p.form >= 1 && p.form <= 5 && p.awaken[p.form] > 0) {
+      p.awaken[p.form] -= dtFrames;
+      if (p.awaken[p.form] <= 0) { p.awaken[p.form] = 0; this.renderFormBar(); }
     }
     this.updateSlotTimersOnly();
 
