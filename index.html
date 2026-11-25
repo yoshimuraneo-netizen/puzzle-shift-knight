@@ -278,6 +278,11 @@
   .form-slot.awakened {
     border-color: #fde047 !important;
     box-shadow: 0 0 12px rgba(253, 224, 71, 0.55);
+    animation: awakenPulse 1s ease-in-out infinite;
+  }
+  @keyframes awakenPulse {
+    0%, 100% { box-shadow: 0 0 8px rgba(253, 224, 71, 0.35); }
+    50% { box-shadow: 0 0 20px rgba(253, 224, 71, 0.85); }
   }
   .awaken-badge {
     color: #fde047;
@@ -456,7 +461,11 @@
     transition: opacity 0.22s, top 0.26s cubic-bezier(0.22, 1, 0.36, 1);
     white-space: nowrap;
   }
-  .match-toast.show { opacity: 1; top: 10px; }
+  .match-toast.show { opacity: 1; top: 10px; animation: toastPop 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+  @keyframes toastPop {
+    from { transform: translateX(-50%) scale(0.7); }
+    to { transform: translateX(-50%) scale(1); }
+  }
 
   /* Grid & Gems */
   .grid-container {
@@ -527,6 +536,12 @@
     transform: scale(1.22);
     filter: brightness(1.7);
     box-shadow: 0 0 18px #fff;
+    animation: gemPop 0.28s ease-out;
+  }
+  @keyframes gemPop {
+    0% { transform: scale(1); filter: brightness(1); }
+    40% { transform: scale(1.35); filter: brightness(2); }
+    100% { transform: scale(1.22); filter: brightness(1.7); }
   }
   .gem-cell.dropping {
     animation: gemDropDown 0.25s cubic-bezier(0.22, 0.9, 0.36, 1) backwards;
@@ -1383,6 +1398,11 @@ class MatchPuzzleManager {
       const junkMsg = adjacentJunk.size > 0 ? ` (🪨×${adjacentJunk.size}破壊!)` : '';
       const toastText = (combo > 1 ? `${combo}連鎖! ` : '') + msgs.join(' / ') + ' 延長！' + junkMsg;
       this.showToast(toastText, COLORS[firstCol || 0].color);
+      // 連鎖はアクション側にも大きく出す
+      if (combo >= 2 && window.game) {
+        game.addFloatingText(game.player.x - 10, game.player.y - 26, `🔗 ${combo}連鎖！`, '#fde047');
+        game.screenFlash('#fde047', 4);
+      }
     }
 
     setTimeout(() => {
@@ -1785,6 +1805,13 @@ class ActionGame {
     this.afterimages = [];
     this.floatingTexts = [];
     this.shake = 0;
+    // 演出用: ヒットストップ・画面フラッシュ・背景モート
+    this.hitStop = 0;
+    this.flashLife = 0;
+    this.flashMax = 1;
+    this.flashColor = '#ffffff';
+    this.fxTime = 0;
+    this.motes = [];
 
     this.bindInputs();
     this.loadStage(0, true);
@@ -2056,6 +2083,7 @@ class ActionGame {
   extendColorTime(formId, addSeconds) {
     const p = this.player;
     const prev = p.timers[formId];
+    const wasForm = p.form;
     p.timers[formId] = Math.min(MAX_FORM_FRAMES, prev + addSeconds * 60);
     p.form = formId;
     p.shadowTimer = 0;
@@ -2066,6 +2094,8 @@ class ActionGame {
 
     const cInfo = COLORS[formId - 1];
     this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, cInfo.color, 20);
+    // 別の色に変身した瞬間はリングが広がる
+    if (wasForm !== formId) this.spawnRing(p.x + p.w / 2, p.y + p.h / 2, cInfo.color, 20, 3.2);
     this.addFloatingText(p.x - 10, p.y - 16, `${cInfo.icon}${cInfo.name} +${addSeconds}秒!`, cInfo.color);
     this.renderFormBar();
     this.updateHUD(true);
@@ -2079,10 +2109,17 @@ class ActionGame {
   // 覚醒: 指定色のアクションを数秒間強化する
   awakenColor(formId, frames) {
     const p = this.player;
+    const isNew = p.awaken[formId] <= 0;
     p.awaken[formId] = Math.max(p.awaken[formId], frames);
     const cInfo = COLORS[formId - 1];
     this.addFloatingText(p.x - 10, p.y - 26, `🔥 ${cInfo.icon}${cInfo.name} 覚醒！`, '#fde047');
     this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#fde047', 18);
+    // 新しく覚醒した瞬間だけ金色のフラッシュとリングで派手に
+    if (isNew) {
+      this.spawnRing(p.x + p.w / 2, p.y + p.h / 2, '#fde047', 26, 4);
+      this.screenFlash('#fde047', 8);
+      this.shake = Math.max(this.shake, 4);
+    }
     this.renderFormBar();
   }
 
@@ -2100,6 +2137,9 @@ class ActionGame {
       p.jumpsLeft = Math.max(p.jumpsLeft, 2);
     }
     sfx.play('click');
+    const cInfo = COLORS[formId - 1];
+    this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, cInfo.color, 12);
+    this.spawnRing(p.x + p.w / 2, p.y + p.h / 2, cInfo.color, 16, 2.8);
     this.renderFormBar();
     this.updateHUD(true);
   }
@@ -2198,13 +2238,13 @@ class ActionGame {
     this.floatingTexts.push({ x, y, text, color, life: 75 });
   }
 
-  spawnBurst(x, y, color, count = 14) {
+  spawnBurst(x, y, color, count = 14, grav = 0.12) {
     for (let i = 0; i < count; i++) {
       const ang = Math.random() * Math.PI * 2;
       const spd = 1 + Math.random() * 4;
       this.particles.push({
         x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd - 1,
-        size: 2 + Math.random() * 3.5, color, life: 20 + Math.random() * 20
+        size: 2 + Math.random() * 3.5, color, life: 20 + Math.random() * 20, grav
       });
     }
   }
@@ -2243,10 +2283,16 @@ class ActionGame {
           this.score += 1000;
           sfx.play('break');
           this.spawnBurst(ex, ey, color, 30);
+          this.spawnRing(ex, ey, '#fde047', 30, 4);
+          this.screenFlash('#fde047', 10);
+          this.hitStop = 6;
+          this.shake = 10;
           this.addFloatingText(en.x - 20, en.y - 14, '👑 ボス撃破！+1000', '#fde047');
         } else {
           sfx.play('hit');
           this.spawnBurst(ex, ey, '#fff', 8);
+          this.hitStop = 3;
+          this.screenFlash('#fde047', 5);
           this.addFloatingText(en.x - 10, en.y - 12, `💥 弱点ヒット！HP ${en.hp}/${en.maxHp}`, '#fde047');
         }
         this.updateHUD(true);
@@ -2273,9 +2319,13 @@ class ActionGame {
     this.thawFrozenCell();
     if (en.hp <= 0) {
       en.dead = true;
-      this.score += en.type === 'boss' ? 1000 : en.type === 'guardian' ? 300 : 100;
+      const gain = en.type === 'boss' ? 1000 : en.type === 'guardian' ? 300 : 100;
+      this.score += gain;
       sfx.play('break');
       this.spawnBurst(ex, ey, color, en.type === 'boss' ? 30 : en.type === 'guardian' ? 24 : 14);
+      this.hitStop = 3;
+      if (en.type === 'guardian') this.shake = Math.max(this.shake, 5);
+      this.addFloatingText(en.x - 6, en.y - 22, `+${gain}`, '#fde047');
       if (en.type === 'guardian') this.addFloatingText(en.x - 10, en.y - 12, 'ガーディアン撃破!', '#fde047');
       if (en.type === 'boss') this.addFloatingText(en.x - 20, en.y - 14, '👑 ボス撃破！+1000', '#fde047');
     } else {
@@ -2507,6 +2557,7 @@ class ActionGame {
     this.shake = 8;
     sfx.play('hit');
     this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#ff4d5a', 16);
+    this.screenFlash('#ef4444', 8);
     this.updateHUD(true);
 
     if (p.hp > 0 && window.puzzles) {
@@ -2519,6 +2570,10 @@ class ActionGame {
       this.gameOver = true;
       this.setPuzzlePaused(false);
       if (window.puzzles) puzzles.setActive(false);
+      this.screenFlash('#ef4444', 14);
+      this.shake = 12;
+      this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#ff4d5a', 40);
+      this.spawnRing(p.x + p.w / 2, p.y + p.h / 2, '#ff4d5a', 26, 4);
       document.getElementById('overlayTitle').textContent = 'GAME OVER';
       document.getElementById('overlayDesc').textContent = 'HPが0になりました。もう一度挑戦しよう！';
       document.getElementById('overlayBtn').textContent = '▶ リトライ';
@@ -2528,7 +2583,8 @@ class ActionGame {
   }
 
   update(dtFrames = 1) {
-    if (!this.running || this.puzzlePaused) return;
+    // ゲーム停止中(クリア画面・ポーズ中)も演出だけは動かす
+    if (!this.running || this.puzzlePaused) { this.updateFx(dtFrames); return; }
     const p = this.player;
 
     if (p.form !== 0 && p.timers[p.form] > 0) {
@@ -2564,7 +2620,6 @@ class ActionGame {
     if (p.actionCd > 0) p.actionCd--;
     if (p.zapTimer > 0) p.zapTimer--;
     if (p.hintCd > 0) p.hintCd--;
-    if (this.shake > 0) this.shake *= 0.85;
 
     // コヨーテタイム(約0.1秒=6フレーム): 地面を離れてすぐならまだジャンプできる
     if (p.onGround) p.coyoteTimer = 6;
@@ -2676,6 +2731,8 @@ class ActionGame {
     }
 
     // Y Movement
+    const wasGround = p.onGround;
+    const fallVy = p.vy;
     const prevBottom = p.y + p.h;
     p.y += p.vy;
     p.onGround = false;
@@ -2703,6 +2760,11 @@ class ActionGame {
         p.y = (Math.floor(p.y / this.TILE) + 1) * this.TILE + 0.01;
         p.vy = 0;
       }
+    }
+
+    // 着地のホコリ(落下速度が速かったときだけ)
+    if (!wasGround && p.onGround && fallVy > 3) {
+      this.spawnBurst(p.x + p.w / 2, p.y + p.h, '#94a3b8', 8);
     }
 
     // スカイダイブの着地衝撃波: 着地時に近くの敵に1ダメージ
@@ -2844,6 +2906,7 @@ class ActionGame {
           if (en.charging === 0) {
             if (window.puzzles) puzzles.freezeRandomCells(2);
             this.addFloatingText(en.x - 10, en.y - 14, '🧊 氷結攻撃！', '#7dd3fc');
+            this.screenFlash('#7dd3fc', 6);
             en.freezeCd = 720;
           }
         } else if (en.freezeCd > 0) {
@@ -2904,6 +2967,8 @@ class ActionGame {
         this.addFloatingText(boss.x - 20, boss.y - 18, `👑 カラーシフト・ボス出現！今は${bInfo.icon}${bInfo.name}のバリア！`, bInfo.color);
         sfx.play('zap');
         this.shake = 6;
+        this.screenFlash('#c084fc', 10);
+        this.spawnRing(boss.x + boss.w / 2, boss.y + boss.h / 2, '#c084fc', 26, 4);
       }
       if (boss.counterCd > 0) boss.counterCd--;
       if (boss.stunTimer > 0) {
@@ -2915,6 +2980,7 @@ class ActionGame {
           boss.rainCd = 480;
           if (window.puzzles) puzzles.addJunkRain();
           this.shake = 5;
+          this.screenFlash('#c084fc', 5);
           this.addFloatingText(boss.x - 30, boss.y - 18, '💀 お邪魔ブロック降臨！', '#c084fc');
         }
         if (boss.shootCd > 0) boss.shootCd--;
@@ -2932,6 +2998,7 @@ class ActionGame {
           boss.nextBarrier = nb;
           const cInfo = COLORS[boss.barrier - 1];
           this.addFloatingText(boss.x - 20, boss.y - 18, `🛡 バリア変化！今は${cInfo.icon}${cInfo.name}！`, cInfo.color);
+          this.spawnBurst(boss.x + boss.w / 2, boss.y + boss.h / 2, cInfo.color, 12);
           sfx.play('zap');
         }
         // ボスの氷結溜め攻撃(2秒の予告のあとパズルを2マス凍らせる)
@@ -2940,6 +3007,7 @@ class ActionGame {
           if (boss.charging === 0) {
             if (window.puzzles) puzzles.freezeRandomCells(2);
             this.addFloatingText(boss.x - 30, boss.y - 18, '🧊 氷結攻撃！', '#7dd3fc');
+            this.screenFlash('#7dd3fc', 6);
             boss.freezeCd = 720;
           }
         } else if (boss.freezeCd > 0) {
@@ -2965,12 +3033,59 @@ class ActionGame {
       if (remove) this.enemyShots.splice(i, 1);
     }
 
-    this.particles = this.particles.filter(pt => { pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.12; return --pt.life > 0; });
-    this.afterimages = this.afterimages.filter(a => --a.life > 0);
-    this.floatingTexts = this.floatingTexts.filter(ft => { ft.y -= 0.6; return --ft.life > 0; });
+    this.updateFx(dtFrames);
 
     const targetCam = Math.max(0, Math.min(this.cols * this.TILE - this.canvas.width, p.x - this.canvas.width * 0.38));
     this.cameraX += (targetCam - this.cameraX) * 0.12;
+  }
+
+  // 演出の更新(パーティクル・残像・フローティング文字・画面揺れ・フラッシュ・背景モート)
+  updateFx(dtFrames = 1) {
+    this.fxTime += dtFrames;
+    if (this.flashLife > 0) this.flashLife -= dtFrames;
+    if (this.shake > 0) this.shake *= 0.85;
+    this.particles = this.particles.filter(pt => { pt.x += pt.vx; pt.y += pt.vy; pt.vy += (pt.grav ?? 0.12); return --pt.life > 0; });
+    this.afterimages = this.afterimages.filter(a => --a.life > 0);
+    this.floatingTexts = this.floatingTexts.filter(ft => { ft.y -= 0.6; return --ft.life > 0; });
+    const W = this.canvas ? this.canvas.width : 640, H = this.canvas ? this.canvas.height : 416;
+    this.motes.forEach(mo => {
+      mo.x += mo.drift; mo.y -= mo.spd;
+      if (mo.y < -4) { mo.y = H + 4; mo.x = Math.random() * W; }
+      if (mo.x < -4) mo.x = W + 4; else if (mo.x > W + 4) mo.x = -4;
+    });
+  }
+
+  // 画面全体を一瞬光らせる(覚醒・ボス出現・クリア・被弾など)
+  screenFlash(color, frames = 6) {
+    this.flashColor = color;
+    this.flashMax = frames;
+    this.flashLife = frames;
+  }
+
+  // 輪になって広がるパーティクル(変身・覚醒・ボス撃破など)
+  spawnRing(x, y, color, count = 24, speed = 3.5) {
+    for (let i = 0; i < count; i++) {
+      const ang = (i / count) * Math.PI * 2;
+      const spd = speed * (0.7 + Math.random() * 0.6);
+      this.particles.push({
+        x, y, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd,
+        size: 2 + Math.random() * 2.5, color, life: 26 + Math.random() * 14, grav: 0
+      });
+    }
+  }
+
+  // ステージクリアの紙吹雪
+  spawnConfetti() {
+    const W = this.canvas ? this.canvas.width : 640;
+    const colors = ['#ff4d5a', '#38bdf8', '#4ade80', '#fde047', '#c084fc', '#fb923c'];
+    for (let i = 0; i < 70; i++) {
+      this.particles.push({
+        x: Math.random() * W, y: -10 - Math.random() * 50,
+        vx: (Math.random() - 0.5) * 2, vy: 1 + Math.random() * 2,
+        size: 3 + Math.random() * 3, color: colors[i % colors.length],
+        life: 60 + Math.random() * 50, grav: 0.08
+      });
+    }
   }
 
   // 最終ランク評価: タイム・残HP・最大連鎖・パズル手数の4項目(S=4〜C=1)の平均で決める
@@ -3016,6 +3131,8 @@ class ActionGame {
     if (window.puzzles) puzzles.setActive(false);
     // クリア後に残っているお邪魔ブロックは全部消す(次のステージはきれいな盤面から)
     if (window.puzzles) puzzles.clearAllJunk();
+    this.spawnConfetti();
+    this.screenFlash('#fde047', 10);
     this.score += 500;
     // このステージで稼いだスコア(クリアボーナス500含む)を記録する
     this.stageScores[this.stageIndex] = this.score - this.stageStartScore;
@@ -3057,12 +3174,31 @@ class ActionGame {
     ctx.fillStyle = bgGrad;
     ctx.fillRect(0, 0, W, H);
 
-    ctx.fillStyle = 'rgba(148, 163, 184, 0.14)';
+    // 背景の星はきらめき、光のモートがゆっくり漂う
     for (let i = 0; i < 36; i++) {
       const sx = ((i * 97) - this.cameraX * 0.25) % W;
       const sy = (i * 53) % (H - 80);
+      ctx.globalAlpha = 0.08 + 0.09 * (0.5 + 0.5 * Math.sin(this.fxTime * 0.06 + i * 1.7));
+      ctx.fillStyle = '#94a3b8';
       ctx.fillRect(sx < 0 ? sx + W : sx, sy, 2, 2);
     }
+    ctx.globalAlpha = 1;
+    if (this.motes.length === 0) {
+      for (let i = 0; i < 10; i++) {
+        this.motes.push({
+          x: Math.random() * W, y: Math.random() * H,
+          r: 1.5 + Math.random() * 2.5,
+          spd: 0.08 + Math.random() * 0.2, drift: (Math.random() - 0.5) * 0.3,
+          color: ['#38bdf8', '#fde047', '#c084fc', '#4ade80'][i % 4]
+        });
+      }
+    }
+    this.motes.forEach(mo => {
+      ctx.globalAlpha = 0.25 + 0.2 * (0.5 + 0.5 * Math.sin(this.fxTime * 0.05 + mo.x * 0.05));
+      ctx.fillStyle = mo.color;
+      ctx.beginPath(); ctx.arc(mo.x, mo.y, mo.r, 0, Math.PI * 2); ctx.fill();
+    });
+    ctx.globalAlpha = 1;
 
     ctx.save();
     const sx = (Math.random() - 0.5) * this.shake;
@@ -3376,6 +3512,22 @@ class ActionGame {
     });
 
     ctx.restore();
+
+    // 画面フラッシュ(金・紫・赤などの一瞬の光)
+    if (this.flashLife > 0) {
+      ctx.globalAlpha = Math.min(0.35, (this.flashLife / this.flashMax) * 0.35);
+      ctx.fillStyle = this.flashColor;
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
+    // HPが少ないときは画面のふちが赤く脈打つ
+    if (this.running && this.player.hp <= 2 && this.player.hp > 0) {
+      const a = 0.18 + 0.12 * Math.sin(this.fxTime * 0.18);
+      ctx.strokeStyle = `rgba(239, 68, 68, ${a})`;
+      ctx.lineWidth = 6;
+      ctx.strokeRect(3, 3, W - 6, H - 6);
+      ctx.lineWidth = 1;
+    }
   }
 
   loop() {
@@ -3385,7 +3537,13 @@ class ActionGame {
     // 実時間ベース: 60fps換算の経過フレーム数(カクつき・タブ復帰の暴走を防ぐため最大6フレーム)
     const dtFrames = Math.max(0, Math.min(dtMs / (1000 / 60), 6));
     if (this.running) this.playFrames += dtFrames;
-    this.update(dtFrames);
+    // ヒットストップ: 攻撃が決まった瞬間だけ世界を止めて演出だけ進める
+    if (this.hitStop > 0) {
+      this.hitStop -= dtFrames;
+      this.updateFx(dtFrames);
+    } else {
+      this.update(dtFrames);
+    }
     this.draw();
     requestAnimationFrame(() => this.loop());
   }
