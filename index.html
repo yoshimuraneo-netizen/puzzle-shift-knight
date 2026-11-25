@@ -661,7 +661,7 @@
     <button class="btn-sm active" id="btnStage1" onclick="game.loadStage(0); this.blur()">STAGE 1</button>
     <button class="btn-sm" id="btnStage2" onclick="game.loadStage(1); this.blur()">STAGE 2</button>
     <button class="btn-sm" id="btnStage3" onclick="game.loadStage(2); this.blur()">STAGE 3</button>
-    <button class="btn-sm" onclick="game.loadStage(game.stageIndex); this.blur()">↻ リトライ</button>
+    <button class="btn-sm" onclick="game.retryStage(); this.blur()">↻ リトライ</button>
     <button class="btn-sm active" id="btnSound" onclick="sfx.toggle(); this.blur()">🔊 SE ON</button>
   </div>
 </header>
@@ -1915,7 +1915,7 @@ class ActionGame {
         }
         this.loadStage((this.stageIndex + 1) % STAGES.length, false);
       } else if (this.gameOver) {
-        this.loadStage(this.stageIndex, false);
+        this.retryStage();
       }
       this.running = true;
       this.setPuzzlePaused(false);
@@ -1927,6 +1927,13 @@ class ActionGame {
       // タイトル画面に戻る(ステージ1から・スコアはリセットされる)
       this.loadStage(0, true);
     };
+  }
+
+  // リトライ: 同じステージからやり直す(スコアは0に初期化する)
+  retryStage() {
+    this.score = 0;
+    this.stageScores = [0, 0, 0];
+    this.loadStage(this.stageIndex, false);
   }
 
   loadStage(idx, showTitle = false) {
@@ -2578,6 +2585,11 @@ class ActionGame {
       this.gameOver = true;
       this.setPuzzlePaused(false);
       if (window.puzzles) puzzles.setActive(false);
+      // 死亡時はスコアを0に初期化する(ステージごとの内訳もリセット)
+      this.score = 0;
+      this.stageScores = [0, 0, 0];
+      this.stageStartScore = 0;
+      this.updateHUD(true);
       this.screenFlash('#ef4444', 14);
       this.shake = 12;
       this.spawnBurst(p.x + p.w / 2, p.y + p.h / 2, '#ff4d5a', 40);
