@@ -658,9 +658,9 @@
     <span class="badge">隠し連携ルート × 時間延長 × 5種パズル</span>
   </div>
   <div class="header-controls">
-    <button class="btn-sm active" id="btnStage1" onclick="game.selectStage(0); this.blur()">STAGE 1</button>
-    <button class="btn-sm" id="btnStage2" onclick="game.selectStage(1); this.blur()">STAGE 2</button>
-    <button class="btn-sm" id="btnStage3" onclick="game.selectStage(2); this.blur()">STAGE 3</button>
+    <button class="btn-sm active" id="btnStage1" disabled title="ステージ選択はできません" onclick="game.selectStage(0); this.blur()">STAGE 1</button>
+    <button class="btn-sm" id="btnStage2" disabled title="ステージ選択はできません" onclick="game.selectStage(1); this.blur()">STAGE 2</button>
+    <button class="btn-sm" id="btnStage3" disabled title="ステージ選択はできません" onclick="game.selectStage(2); this.blur()">STAGE 3</button>
     <button class="btn-sm" onclick="game.retryStage(); this.blur()">↻ リトライ</button>
     <button class="btn-sm active" id="btnSound" onclick="sfx.toggle(); this.blur()">🔊 SE ON</button>
   </div>
