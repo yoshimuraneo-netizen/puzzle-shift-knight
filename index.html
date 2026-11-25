@@ -174,29 +174,33 @@
   .overlay-banner h2 { margin: 0; font-size: 1.6rem; }
   .overlay-banner p { margin: 0; color: #cbd5e1; max-width: 490px; font-size: 0.87rem; line-height: 1.55; }
 
+  /* スロー中は画面を覆わず、上部の小さなバナーだけ出す(スローの動きが見えるように) */
   .pause-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(7, 10, 18, 0.52);
+    background: transparent;
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    padding-top: 10px;
     gap: 10px;
     z-index: 4;
+    pointer-events: none;
   }
   .pause-overlay.hidden { display: none; }
   .pause-box {
-    background: rgba(15, 23, 42, 0.94);
+    background: rgba(15, 23, 42, 0.92);
     border: 2px solid #38bdf8;
     border-radius: 12px;
-    padding: 16px 26px;
+    padding: 10px 18px;
     text-align: center;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+    pointer-events: auto;
   }
   .pause-box h3 { margin: 0; font-size: 1.15rem; color: #e2e8f0; }
 
@@ -681,8 +685,8 @@
       <canvas id="gameCanvas" width="640" height="416"></canvas>
       <div class="pause-overlay hidden" id="pauseOverlay">
         <div class="pause-box">
-          <h3>⏸ PAUSE（パズル中）</h3>
-          <button class="btn-primary" id="btnResumeCanvas" onclick="game.setPuzzlePaused(false); this.blur()">▶ 一時停止を解除</button>
+          <h3>🐢 SLOW（パズル中・0.2倍速）</h3>
+          <button class="btn-primary" id="btnResumeCanvas" onclick="game.setPuzzlePaused(false); this.blur()">▶ スローを解除（通常速度へ）</button>
         </div>
       </div>
       <div class="overlay-banner" id="overlayBanner">
@@ -737,7 +741,7 @@
       <div id="puzzleBoard"></div>
     </div>
 
-    <button class="btn-resume-puzzle" id="btnResumePuzzle" disabled onclick="game.togglePuzzlePause(); this.blur()">⏸ 一時停止してパズル</button>
+    <button class="btn-resume-puzzle" id="btnResumePuzzle" disabled onclick="game.togglePuzzlePause(); this.blur()">🐢 スローにしてパズル</button>
 
     <div class="legend-box">
       <div><b style="color:#ff4d5a">🔥 赤×3</b>：赤壁破壊＋突進＆高速移動(+時間延長)</div>
@@ -1795,6 +1799,9 @@ class ActionGame {
     this.enemyShots = [];
     this.running = false;
     this.puzzlePaused = false;
+    // パズル操作中はスロー再生: 5フレームに1回だけ世界を進める(0.2倍速)
+    this.slowAcc = 0;
+    this.slowEvery = 5;
     this.puzzleStyle = 1;
     this.keys = { left: false, right: false, jump: false, action: false };
     this.prevKeys = { jump: false, action: false };
@@ -1822,6 +1829,7 @@ class ActionGame {
     if (!this.running) paused = false;
     if (!paused && window.puzzles && puzzles.busy) return;
     this.puzzlePaused = paused;
+    if (paused) this.slowAcc = 0;
     this.syncPauseUI();
   }
 
@@ -1840,17 +1848,17 @@ class ActionGame {
     if (overlay) overlay.classList.toggle('hidden', !showPause);
     if (btnCanvas) {
       btnCanvas.disabled = busy;
-      btnCanvas.textContent = busy ? '連鎖中...' : '▶ 一時停止を解除';
+      btnCanvas.textContent = busy ? '連鎖中...' : '▶ スローを解除（通常速度へ）';
     }
     if (btnPuzzle) {
       btnPuzzle.disabled = !this.running || busy;
       btnPuzzle.classList.toggle('paused-state', showPause);
       if (!this.running) {
-        btnPuzzle.textContent = '⏸ 一時停止してパズル';
+        btnPuzzle.textContent = '🐢 スローにしてパズル';
       } else if (showPause) {
-        btnPuzzle.textContent = busy ? '連鎖中...' : '▶ パズル終了（一時停止を解除）';
+        btnPuzzle.textContent = busy ? '連鎖中...' : '▶ パズル終了（通常速度へ）';
       } else {
-        btnPuzzle.textContent = '⏸ 一時停止してパズル';
+        btnPuzzle.textContent = '🐢 スローにしてパズル';
       }
     }
   }
@@ -2583,8 +2591,15 @@ class ActionGame {
   }
 
   update(dtFrames = 1) {
-    // ゲーム停止中(クリア画面・ポーズ中)も演出だけは動かす
-    if (!this.running || this.puzzlePaused) { this.updateFx(dtFrames); return; }
+    // ゲーム停止中(クリア画面・タイトル)は演出だけ動かす
+    if (!this.running) { this.updateFx(dtFrames); return; }
+    // パズル操作中はスロー再生: 5フレームに1回だけ世界を進める(0.2倍速)
+    if (this.puzzlePaused) {
+      this.slowAcc += dtFrames;
+      if (this.slowAcc < this.slowEvery) { this.updateFx(dtFrames); return; }
+      this.slowAcc -= this.slowEvery;
+      dtFrames = 1;
+    }
     const p = this.player;
 
     if (p.form !== 0 && p.timers[p.form] > 0) {
@@ -3527,6 +3542,14 @@ class ActionGame {
       ctx.lineWidth = 6;
       ctx.strokeRect(3, 3, W - 6, H - 6);
       ctx.lineWidth = 1;
+    }
+    // パズル操作中は左上にスロー表示
+    if (this.puzzlePaused && this.running) {
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillRect(8, 8, 112, 24);
+      ctx.fillStyle = '#7dd3fc';
+      ctx.font = 'bold 13px sans-serif';
+      ctx.fillText('🐢 スロー 0.2x', 14, 25);
     }
   }
 
