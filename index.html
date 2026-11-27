@@ -2797,18 +2797,16 @@ class ActionGame {
     }
 
     // 電流床: 黄色以外は電流床を横切れない(床の中心へ近づく移動を止める)。
-    // ジャンプで飛び越えるのも防ぐため、どの高さにいても床の上では働く。
+    // 床が目の前にあるときだけ働く(足元のすぐ下が電流床のとき)。高く跳んでいるときは通れる。
     if (p.form !== 4) {
-      const cxNew = Math.floor((p.x + p.w / 2) / this.TILE);
-      if (cxNew >= 0 && cxNew < this.cols) {
-        let sRow = -1;
-        for (let r = 0; r < this.rows; r++) {
-          if (this.grid[r][cxNew] === 'S') { sRow = r; break; }
-        }
-        if (sRow >= 0) {
+      const feetRow = Math.floor((p.y + p.h) / this.TILE);
+      const floorRow = feetRow + 1;
+      if (floorRow >= 0 && floorRow < this.rows) {
+        const cxNew = Math.floor((p.x + p.w / 2) / this.TILE);
+        if (cxNew >= 0 && cxNew < this.cols && this.grid[floorRow][cxNew] === 'S') {
           let left = cxNew, right = cxNew;
-          while (left - 1 >= 0 && this.grid[sRow][left - 1] === 'S') left--;
-          while (right + 1 < this.cols && this.grid[sRow][right + 1] === 'S') right++;
+          while (left - 1 >= 0 && this.grid[floorRow][left - 1] === 'S') left--;
+          while (right + 1 < this.cols && this.grid[floorRow][right + 1] === 'S') right++;
           const centerX = ((left + right + 1) * this.TILE) / 2;
           if (Math.abs(p.x + p.w / 2 - centerX) < Math.abs(oldX + p.w / 2 - centerX)) {
             p.x = oldX; p.vx = 0;
