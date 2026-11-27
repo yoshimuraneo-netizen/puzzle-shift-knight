@@ -2196,7 +2196,8 @@ class ActionGame {
       const ready = frames > 0;
       const active = this.player.form === fid;
       const secText = ready ? Math.ceil(frames / 60) + 's' : '🔒0s';
-      const pct = Math.min(100, (frames / (60 * 24)) * 100);
+      // ゲージは上限(30秒)で満タンになる(上限と連動)
+      const pct = Math.min(100, (frames / MAX_FORM_FRAMES) * 100);
 
       const slot = document.createElement('div');
       const awakened = this.player.awaken[fid] > 0;
@@ -2228,7 +2229,8 @@ class ActionGame {
         if (timeEl.textContent !== text) timeEl.textContent = text;
       }
       if (barEl) {
-        const pct = Math.min(100, (frames / (60 * 24)) * 100);
+        // ゲージは上限(30秒)で満タンになる(上限と連動)
+        const pct = Math.min(100, (frames / MAX_FORM_FRAMES) * 100);
         barEl.style.width = `${pct}%`;
       }
       const aw = this.player.awaken[fid];
