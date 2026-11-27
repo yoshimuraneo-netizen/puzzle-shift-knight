@@ -2109,6 +2109,7 @@ class ActionGame {
     p.timers[formId] = Math.min(MAX_FORM_FRAMES, prev + addSeconds * 60);
     p.form = formId;
     p.shadowTimer = 0;
+    this.pushOutOfSolid();
     p.airSkyGrace = false;
     if (formId === 2 && !p.onGround) {
       p.jumpsLeft = Math.max(p.jumpsLeft, 2);
@@ -2155,6 +2156,7 @@ class ActionGame {
     }
     p.form = formId;
     p.shadowTimer = 0;
+    this.pushOutOfSolid();
     if (formId === 2 && !p.onGround) {
       p.jumpsLeft = Math.max(p.jumpsLeft, 2);
     }
@@ -2396,10 +2398,11 @@ class ActionGame {
 
   triggerSpecialAction() {
     const p = this.player;
-    // 影潜り中の再ACTで解除する
+    // 影潜り中の再ACTで解除する(壁の中にいたら外へ押し出す)
     if (p.form === 5 && p.shadowTimer > 0) {
       p.shadowTimer = 0;
       p.actionCd = 18;
+      this.pushOutOfSolid();
       sfx.play('click');
       return;
     }
@@ -2542,6 +2545,30 @@ class ActionGame {
     return false;
   }
 
+  // 影潜りが終わったときに壁の中にいたら、一番近い壁の外へ押し出す
+  pushOutOfSolid() {
+    const p = this.player;
+    if (!this.collidesRect(p.x, p.y, p.w, p.h, false)) return;
+    const dirs = [[1, 0], [-1, 0], [0, -1], [0, 1]];
+    let best = null;
+    for (const [dx, dy] of dirs) {
+      let x = p.x, y = p.y, steps = 0;
+      while (steps < 64 && this.collidesRect(x, y, p.w, p.h, false)) {
+        x += dx; y += dy; steps++;
+      }
+      if (!this.collidesRect(x, y, p.w, p.h, false) && (best === null || steps < best.steps)) {
+        best = { x, y, steps };
+      }
+    }
+    if (best) {
+      p.x = best.x; p.y = best.y;
+    } else {
+      // どこにも抜け出せないときはスタート地点に戻す
+      p.x = p.spawnX; p.y = p.spawnY;
+    }
+    p.vx = 0; p.vy = 0;
+  }
+
   checkGimmickHint() {
     const p = this.player;
     if (p.hintCd > 0) return;
@@ -2626,6 +2653,7 @@ class ActionGame {
       if (p.timers[p.form] <= 0) {
         p.timers[p.form] = 0;
         p.shadowTimer = 0;
+        this.pushOutOfSolid();
         const expiredForm = p.form;
         const cInfo = COLORS[expiredForm - 1];
         this.addFloatingText(p.x - 10, p.y - 16, `${cInfo.icon}${cInfo.name} 時間切れ!`, '#94a3b8');
@@ -2649,7 +2677,10 @@ class ActionGame {
     if (p.invuln > 0) p.invuln--;
     if (p.shadowTimer > 0) {
       p.shadowTimer -= dtFrames;
-      if (p.shadowTimer < 0) p.shadowTimer = 0;
+      if (p.shadowTimer <= 0) {
+        p.shadowTimer = 0;
+        this.pushOutOfSolid();
+      }
     }
     if (p.actionCd > 0) p.actionCd--;
     if (p.zapTimer > 0) p.zapTimer--;
