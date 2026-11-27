@@ -680,6 +680,7 @@
     <button class="btn-sm active" id="btnStage1" disabled title="ステージ選択はできません" onclick="game.selectStage(0); this.blur()">STAGE 1</button>
     <button class="btn-sm" id="btnStage2" disabled title="ステージ選択はできません" onclick="game.selectStage(1); this.blur()">STAGE 2</button>
     <button class="btn-sm" id="btnStage3" disabled title="ステージ選択はできません" onclick="game.selectStage(2); this.blur()">STAGE 3</button>
+    <button class="btn-sm" id="btnStage4" disabled title="ステージ選択はできません" onclick="game.selectStage(3); this.blur()">STAGE 4</button>
     <button class="btn-sm" onclick="game.retryStage(); this.blur()">↻ リトライ</button>
     <button class="btn-sm active" id="btnSound" onclick="sfx.toggle(); this.blur()">🔊 SE ON</button>
   </div>
@@ -1823,11 +1824,28 @@ const STAGES = [
       '#     o      R     F     P  #            M     G   ###################  R                M    X  #',
       '#    ===     R           P  #     K      M     G   #                 #  R                M   ### #',
       '#            R     E     P  #   #####  F M     G   #          C  Y   #  R           W    M       #',
-      '#  @         R    ###    P  #          H M     G   #          #  Y   #  R   Q   o  ### E M   o   #',
+      '#  @         R    ###    P  #          H M     G   #          #  Y   #  R       o  ### E M   o   #',
       '#############R###########P###############M#####G####SSSSSS#####  Y###R##R################M########',
-      '##################################################################################################'
-    ]
-  }
+      '##################################################################################################',
+    ]},
+  {
+    name: 'STAGE 4: 最終の試練',
+    secretHint: '✨秘密ルート: 🌑紫影潜り → 💧青で大上昇 → 🍀緑で的撃ち → ⚡黄放電！',
+    map: [
+      '################################################################################################',
+      '            P         M         R         G           Y         P         M         R           ',
+      '            P         M         R         G           Y         P         M         R           ',
+      '            P         M         R         G           Y         P         M         R           ',
+      '            P         M         R         G           Y         P         M         R           ',
+      '            P         M         R         G           Y         P         M         R           ',
+      '            P         M   **    R         G        +  Y         P   oo    M         R           ',
+      '            P  oo     M  ====   R         G      **   Y  ? + B  P  ====   M    +    R           ',
+      '            P ====    M      F  R         G           Y  =====  P      F  M         R           ',
+      '            P         M  F      R  o      G           Y         P  F      M     o   R   o  +  o ',
+      '   @  o oE  P   K  E  M         R H E T   G  C E      Y   W  K  P    E    M   W  K  R    Q  X   ',
+      '############P#########M#########R#########G#####SSSSSSY#########P#########M##SSSSSS#R###########',
+      '################################################################################################',
+    ]}
 ];
 
 /* =========================================================
@@ -1842,7 +1860,7 @@ class ActionGame {
     this.TILE = 32;
     this.stageIndex = 0;
     this.score = 0;
-    this.stageScores = [0, 0, 0];
+    this.stageScores = Array(STAGES.length).fill(0);
     this.stageStartScore = 0;
     this.lastTotalScore = null;
     this.playFrames = 0;
@@ -1960,7 +1978,7 @@ class ActionGame {
         // 最終ステージをクリアして最初から遊ぶときはスコア・記録をリセットする
         if (this.stageIndex === STAGES.length - 1) {
           this.score = 0;
-          this.stageScores = [0, 0, 0];
+          this.stageScores = Array(STAGES.length).fill(0);
           this.playFrames = 0;
           if (window.puzzles) { puzzles.maxChain = 0; puzzles.moveCount = 0; }
         }
@@ -1983,14 +2001,14 @@ class ActionGame {
   // リトライ: 同じステージからやり直す(スコアは0に初期化する)
   retryStage() {
     this.score = 0;
-    this.stageScores = [0, 0, 0];
+    this.stageScores = Array(STAGES.length).fill(0);
     this.loadStage(this.stageIndex, false);
   }
 
   // ステージ選択: 選んだステージから新しく始める(前のスコアは加算されず0から)
   selectStage(idx) {
     this.score = 0;
-    this.stageScores = [0, 0, 0];
+    this.stageScores = Array(STAGES.length).fill(0);
     this.loadStage(idx, false);
   }
 
@@ -2001,12 +2019,12 @@ class ActionGame {
     this.puzzlePaused = false;
     if (showTitle) {
       this.score = 0;
-      this.stageScores = [0, 0, 0];
+      this.stageScores = Array(STAGES.length).fill(0);
       this.playFrames = 0;
       if (window.puzzles) { puzzles.maxChain = 0; puzzles.moveCount = 0; }
     }
     this.stageStartScore = this.score;
-    [1, 2, 3].forEach(n => document.getElementById('btnStage' + n).classList.toggle('active', idx === n - 1));
+    [1, 2, 3, 4].forEach(n => document.getElementById('btnStage' + n).classList.toggle('active', idx === n - 1));
 
     const data = STAGES[idx];
     document.getElementById('hudStageName').textContent = data.name;
@@ -2058,7 +2076,7 @@ class ActionGame {
         else if (ch === 'F') this.enemies.push({ type: 'drone', col: c, x: wx + 4, y: wy + 4, baseY: wy + 4, w: 24, h: 22, vx: 1.1, t: Math.random() * 6, hp: 1, maxHp: 1, hitCd: 0 });
         else if (ch === 'W') this.enemies.push({ type: 'guardian', col: c, x: wx, y: wy - 4, w: 32, h: 36, vx: -0.65, hp: 3, maxHp: 3, hitCd: 0, freezeCd: 600, charging: 0 });
         else if (ch === 'Q') {
-          // ステージ3終盤のカラーシフト・ボス(HP10・4秒ごとに弱点の色が変わる)
+          // 終盤のカラーシフト・ボス(HP10・4秒ごとに弱点の色が変わる)
           const b0 = 1 + Math.floor(Math.random() * 5);
           let b1 = 1 + Math.floor(Math.random() * 5);
           while (b1 === b0) b1 = 1 + Math.floor(Math.random() * 5);
@@ -2692,7 +2710,7 @@ class ActionGame {
       if (window.puzzles) puzzles.setActive(false);
       // 死亡時はスコアを0に初期化する(ステージごとの内訳もリセット)
       this.score = 0;
-      this.stageScores = [0, 0, 0];
+      this.stageScores = Array(STAGES.length).fill(0);
       this.stageStartScore = 0;
       this.updateHUD(true);
       this.screenFlash('#ef4444', 14);
@@ -3122,7 +3140,7 @@ class ActionGame {
     // ボス戦: 近づくと出現し、定期的にお邪魔ブロックを降らせて弾を撃つ
     const boss = this.boss;
     if (boss && !boss.dead) {
-      if (!boss.activated && this.stageIndex === 2 && Math.abs(p.x - boss.x) < 360) {
+      if (!boss.activated && Math.abs(p.x - boss.x) < 360) {
         boss.activated = true;
         boss.rainCd = 420;
         boss.shootCd = 90;
@@ -3258,10 +3276,11 @@ class ActionGame {
     const maxChain = window.puzzles ? puzzles.maxChain : 0;
     const moves = window.puzzles ? puzzles.moveCount : 0;
     const rankOf = (v) => v >= 4 ? 'S' : v >= 3 ? 'A' : v >= 2 ? 'B' : 'C';
-    const timeScore = timeSec <= 300 ? 4 : timeSec <= 480 ? 3 : timeSec <= 720 ? 2 : 1;
+    // 4ステージ分の目安(3ステージ時の4/3倍: タイムS 6:40/A 10:40/B 16:00、手数S 110/A 160/B 240)
+    const timeScore = timeSec <= 400 ? 4 : timeSec <= 640 ? 3 : timeSec <= 960 ? 2 : 1;
     const hpScore = hp >= 5 ? 4 : hp >= 4 ? 3 : hp >= 3 ? 2 : 1;
     const chainScore = maxChain >= 4 ? 4 : maxChain >= 3 ? 3 : maxChain >= 2 ? 2 : 1;
-    const moveScore = moves <= 80 ? 4 : moves <= 120 ? 3 : moves <= 180 ? 2 : 1;
+    const moveScore = moves <= 110 ? 4 : moves <= 160 ? 3 : moves <= 240 ? 2 : 1;
     const avg = (timeScore + hpScore + chainScore + moveScore) / 4;
     const rank = avg >= 3.5 ? 'S' : avg >= 2.5 ? 'A' : avg >= 1.5 ? 'B' : 'C';
     const mm = String(Math.floor(timeSec / 60)).padStart(2, '0');
@@ -3310,9 +3329,10 @@ class ActionGame {
       const bestLine = hs.isRecord
         ? `<b style="color:#fde047">🎉 NEW RECORD!</b>`
         : `ハイスコア: <b>${hs.prev ? hs.prev.score : this.score} pts</b>`;
+      const stageLines = this.stageScores.map((s, i) => `STAGE ${i + 1}: ${s} pts`).join('<br>');
       finalDesc =
         `全ステージ制覇おめでとうございます！<br><b style="color:#7dd3fc">FINAL RESULT</b><br>` +
-        `STAGE 1: ${this.stageScores[0]} pts<br>STAGE 2: ${this.stageScores[1]} pts<br>STAGE 3: ${this.stageScores[2]} pts<br>` +
+        stageLines + '<br>' +
         `最終トータルスコア: <b style="color:#fde047;font-size:1.15rem">${this.score} pts</b><br>` +
         `TIME ${r.timeStr}(${r.timeRank}) ／ HP ${r.hp}/5(${r.hpRank})<br>最大連鎖 ${r.maxChain}(${r.chainRank}) ／ パズル手数 ${r.moves}(${r.moveRank})<br>` +
         `ランク: <b style="color:#fde047;font-size:1.4rem">${r.rank}</b>　${bestLine}`;
