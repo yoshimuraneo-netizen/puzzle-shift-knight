@@ -977,6 +977,9 @@ class MatchPuzzleManager {
     this.dropMap = null;
     this.maxChain = 0;
     this.moveCount = 0;
+    // 盤面リセットの残り回数(ステージごと・5盤面で共有)
+    this.reshuffleMax = 3;
+    this.reshuffleLeft = 3;
     // 凍結中のマス(盤面ごと): 動かせず・揃わず・落ちない
     this.frozen = {};
     for (let m = 1; m <= 5; m++) this.frozen[m] = new Set();
@@ -999,25 +1002,35 @@ class MatchPuzzleManager {
     const wasActive = this.active;
     this.active = flag;
     const overlay = document.getElementById('puzzleLockOverlay');
-    const btnReset = document.getElementById('btnReshuffle');
     if (overlay) overlay.classList.toggle('hidden', flag);
-    if (btnReset) btnReset.disabled = !flag;
     if (flag && !wasActive) {
       this.triggerFullDrop();
       this.renderBoard();
     }
     if (window.game) game.syncPauseUI();
+    this.updateReshuffleButton();
+  }
+
+  // 盤面リセットボタンの残り回数表示と有効/無効を更新する
+  updateReshuffleButton() {
+    const btn = document.getElementById('btnReshuffle');
+    if (!btn) return;
+    btn.textContent = `🔄 盤面リセット（残り${this.reshuffleLeft}回）`;
+    btn.disabled = !this.active || this.reshuffleLeft <= 0;
   }
 
   resetAllBoards() {
     this.selected = null;
     this.busy = false;
     this.poppingSet = new Set();
+    // ステージ開始で盤面リセットの回数を補充する
+    this.reshuffleLeft = this.reshuffleMax;
     for (let m = 1; m <= 5; m++) {
       this.boards[m] = this.createInitialBoard(m, 0);
     }
     this.triggerFullDrop();
     this.renderBoard();
+    this.updateReshuffleButton();
   }
 
   countJunk(b) {
@@ -1323,12 +1336,18 @@ class MatchPuzzleManager {
 
   reshuffle() {
     if (!this.active || this.busy) return;
+    if (this.reshuffleLeft <= 0) {
+      this.showToast('盤面リセットは使い切ったよ！', '#f87171');
+      return;
+    }
+    this.reshuffleLeft--;
     this.selected = null;
     const junks = this.countJunk(this.boards[this.mode]);
     this.boards[this.mode] = this.createInitialBoard(this.mode, junks);
     sfx.play('click');
     this.triggerFullDrop();
     this.renderBoard();
+    this.updateReshuffleButton();
   }
 
   renderTabs() {
