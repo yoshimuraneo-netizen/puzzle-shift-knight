@@ -2277,7 +2277,7 @@ class ActionGame {
     if (r < 0 || r >= this.rows || c < 0 || c >= this.cols) return true;
     const ch = this.grid[r][c];
     if (ch === 'P' && ignorePhase) return false;
-    return ['#', 'R', 'G', 'Y', 'P', 'M'].includes(ch);
+    return ['#', 'R', 'G', 'Y', 'P', 'M', 'S'].includes(ch);
   }
 
   isPlatform(r, c) {
@@ -2758,6 +2758,7 @@ class ActionGame {
     }
 
     // X Movement
+    const oldX = p.x;
     p.x += p.vx;
     if (p.dashTimer > 0) {
       const left = Math.floor(p.x / this.TILE);
@@ -2793,6 +2794,31 @@ class ActionGame {
       if (p.vx > 0) p.x = Math.floor((p.x + p.w - 0.01) / this.TILE) * this.TILE - p.w - 0.01;
       else if (p.vx < 0) p.x = (Math.floor(p.x / this.TILE) + 1) * this.TILE + 0.01;
       p.vx = 0; p.dashTimer = 0;
+    }
+
+    // 電流床: 黄色以外は電流床を横切れない(床の中心へ近づく移動を止める)。
+    // ジャンプで飛び越えるのも防ぐため、どの高さにいても床の上では働く。
+    if (p.form !== 4) {
+      const cxNew = Math.floor((p.x + p.w / 2) / this.TILE);
+      if (cxNew >= 0 && cxNew < this.cols) {
+        let sRow = -1;
+        for (let r = 0; r < this.rows; r++) {
+          if (this.grid[r][cxNew] === 'S') { sRow = r; break; }
+        }
+        if (sRow >= 0) {
+          let left = cxNew, right = cxNew;
+          while (left - 1 >= 0 && this.grid[sRow][left - 1] === 'S') left--;
+          while (right + 1 < this.cols && this.grid[sRow][right + 1] === 'S') right++;
+          const centerX = ((left + right + 1) * this.TILE) / 2;
+          if (Math.abs(p.x + p.w / 2 - centerX) < Math.abs(oldX + p.w / 2 - centerX)) {
+            p.x = oldX; p.vx = 0;
+            if (p.hintCd <= 0) {
+              this.addFloatingText(p.x - 30, p.y - 16, '⚡ 電流床！黄のエレキ形態でないと通れない！', '#facc15');
+              p.hintCd = 70;
+            }
+          }
+        }
+      }
     }
 
     // Y Movement
@@ -2864,7 +2890,10 @@ class ActionGame {
     const cy = Math.floor((p.y + p.h - 1) / this.TILE);
     const midY = Math.floor((p.y + p.h / 2) / this.TILE);
     if (cy >= 0 && cy < this.rows && cx >= 0 && cx < this.cols) {
-      if (this.grid[cy][cx] === 'S' && p.form !== 4) {
+      // 電流床に触れる(中に立つ・上に立つ)と黄色以外は感電する
+      const onS = this.grid[cy][cx] === 'S';
+      const standingOnS = p.onGround && cy + 1 < this.rows && this.grid[cy + 1][cx] === 'S';
+      if ((onS || standingOnS) && p.form !== 4) {
         if (p.hintCd <= 0) {
           this.addFloatingText(p.x - 30, p.y - 16, '⚡ 黄のエレキ形態でないと感電！', '#facc15');
           p.hintCd = 70;
@@ -3609,7 +3638,8 @@ class ActionGame {
     this.lastFrameTime = now;
     // 実時間ベース: 60fps換算の経過フレーム数(カクつき・タブ復帰の暴走を防ぐため最大6フレーム)
     const dtFrames = Math.max(0, Math.min(dtMs / (1000 / 60), 6));
-    if (this.running) this.playFrames += dtFrames;
+    // ポーズ画面(パズル操作中のスロー)ではタイムが止まる
+    if (this.running && !this.puzzlePaused) this.playFrames += dtFrames;
     // ヒットストップ: 攻撃が決まった瞬間だけ世界を止めて演出だけ進める
     if (this.hitStop > 0) {
       this.hitStop -= dtFrames;
