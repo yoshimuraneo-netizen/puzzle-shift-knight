@@ -1846,7 +1846,7 @@ class ActionGame {
 
   setPuzzlePaused(paused) {
     if (!this.running) paused = false;
-    if (!paused && window.puzzles && puzzles.busy) return;
+    // 連鎖中でも解除できる(連鎖は実時間のsetTimeoutで進むので解除しても壊れない)
     this.puzzlePaused = paused;
     if (paused) this.slowAcc = 0;
     this.syncPauseUI();
@@ -1861,21 +1861,21 @@ class ActionGame {
     const overlay = document.getElementById('pauseOverlay');
     const btnCanvas = document.getElementById('btnResumeCanvas');
     const btnPuzzle = document.getElementById('btnResumePuzzle');
-    const busy = window.puzzles ? puzzles.busy : false;
     const showPause = this.running && this.puzzlePaused;
 
     if (overlay) overlay.classList.toggle('hidden', !showPause);
     if (btnCanvas) {
-      btnCanvas.disabled = busy;
-      btnCanvas.textContent = busy ? '連鎖中...' : '▶ スローを解除（通常速度へ）';
+      // 連鎖中でも解除ボタンは有効(押せば通常速度に戻る)
+      btnCanvas.disabled = false;
+      btnCanvas.textContent = '▶ スローを解除（通常速度へ）';
     }
     if (btnPuzzle) {
-      btnPuzzle.disabled = !this.running || busy;
+      btnPuzzle.disabled = !this.running;
       btnPuzzle.classList.toggle('paused-state', showPause);
       if (!this.running) {
         btnPuzzle.textContent = '🐢 スローにしてパズル';
       } else if (showPause) {
-        btnPuzzle.textContent = busy ? '連鎖中...' : '▶ パズル終了（通常速度へ）';
+        btnPuzzle.textContent = '▶ パズル終了（通常速度へ）';
       } else {
         btnPuzzle.textContent = '🐢 スローにしてパズル';
       }
