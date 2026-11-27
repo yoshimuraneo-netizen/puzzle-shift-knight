@@ -2523,11 +2523,14 @@ class ActionGame {
       const radius = 104;
       this.spawnBurst(cx, cy, '#facc15', 22);
       this.enemies.forEach(en => {
+        const ex = en.x + en.w / 2, ey = en.y + en.h / 2;
+        // 壁越しには届かない(壁の向こうの敵には当たらない)
+        if (!this.hasLineOfSight(cx, cy, ex, ey)) return;
         if (p.awaken[4] > 0) {
           // 覚醒・全画面落雷: 画面内の全敵に落雷
-          this.spawnBurst(en.x + en.w / 2, en.y + en.h / 2, '#facc15', 10);
+          this.spawnBurst(ex, ey, '#facc15', 10);
           this.hitEnemy(en, 1, '#facc15');
-        } else if (Math.hypot(en.x + en.w / 2 - cx, en.y + en.h / 2 - cy) < radius) {
+        } else if (Math.hypot(ex - cx, ey - cy) < radius) {
           this.hitEnemy(en, 1, '#facc15');
         }
       });
@@ -2598,6 +2601,19 @@ class ActionGame {
       }
     }
     return false;
+  }
+
+  // 2点の間に壁(固体タイル)がないか調べる(攻撃が壁越しに届かないようにする)
+  hasLineOfSight(x1, y1, x2, y2) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const dist = Math.hypot(dx, dy);
+    const steps = Math.max(1, Math.ceil(dist / 4));
+    for (let i = 1; i < steps; i++) {
+      const x = x1 + (dx * i) / steps;
+      const y = y1 + (dy * i) / steps;
+      if (this.isSolid(Math.floor(y / this.TILE), Math.floor(x / this.TILE))) return false;
+    }
+    return true;
   }
 
   // 影潜りが終わったときに壁の中にいたら、一番近い壁の外へ押し出す
