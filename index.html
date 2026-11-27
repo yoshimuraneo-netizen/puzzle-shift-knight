@@ -415,6 +415,25 @@
     color: #cbd5e1;
   }
 
+  /* Mode 5 guide box (shown only for カラーチェンジ) */
+  .puzzle-guide {
+    background: #171226;
+    border-left: 3px solid #c084fc;
+    border-radius: 6px;
+    padding: 8px 10px;
+    font-size: 0.74rem;
+    color: #ddd6fe;
+    line-height: 1.55;
+  }
+  .puzzle-guide.hidden { display: none; }
+  .puzzle-guide .guide-title { font-weight: 800; color: #c084fc; margin-bottom: 4px; }
+  .puzzle-guide .guide-cross {
+    text-align: center;
+    font-size: 1rem;
+    line-height: 1.3;
+    margin: 2px 0 4px;
+  }
+
   /* Match-3 Board Stage */
   .board-stage {
     position: relative;
@@ -731,6 +750,8 @@
 
     <div class="style-buff-bar" id="styleBuffBar"></div>
 
+    <div class="puzzle-guide hidden" id="puzzleGuide"></div>
+
     <div class="board-stage">
       <div class="puzzle-lock-overlay" id="puzzleLockOverlay">
         <div class="lock-icon">🔒</div>
@@ -953,10 +974,16 @@ const PUZZLE_MODES = {
   5: {
     id: 5, short: '色変化', icon: '✦',
     title: '⑤ カラーチェンジ (十字色送り)',
-    desc: 'マスを押すと自分と上下左右の色が変化(🔥→💧→🍀→⚡→🌀)。3つ揃えよう！',
+    desc: 'マスを押すと、押したマスと上下左右（十字の5マス）の色が1つずつ進むよ（🔥→💧→🍀→⚡→🌀→🔥）。同じ色を縦横に3つ揃えよう！',
     styleName: '魔導スタイル',
     timeBonusSec: 6,
-    styleBuff: 'スタイル効果: 時間延長 +6秒！特殊アクションのクールダウン短縮！'
+    styleBuff: 'スタイル効果: 時間延長 +6秒！特殊アクションのクールダウン短縮！',
+    guide: '<div class="guide-title">✦ カラーチェンジの遊び方</div>'
+      + '<div class="guide-cross">💧<br>💧🔥💧<br>💧</div>'
+      + '<div>真ん中を押すと、＋の形の5マスが1つずつ色が進むよ</div>'
+      + '<div>色の順番：🔥 → 💧 → 🍀 → ⚡ → 🌀 → 🔥（5回押すと元の色に戻る）</div>'
+      + '<div>角のマスは3マス、端のマスは4マスだけ変わるよ。凍ったマスとお邪魔ブロックは変わらないよ</div>'
+      + '<div>コツ：横に揃えたいときは、揃えたいマスの上下を押そう（横並びの中ではそのマスだけ変わるよ）</div>'
   }
 };
 
@@ -1327,6 +1354,11 @@ class MatchPuzzleManager {
     document.getElementById('puzzleTitle').textContent = pm.title;
     document.getElementById('puzzleDesc').textContent = pm.desc;
     document.getElementById('styleBuffBar').innerHTML = `<b>${pm.styleName}</b> — ${pm.styleBuff}`;
+    const guideEl = document.getElementById('puzzleGuide');
+    if (guideEl) {
+      guideEl.innerHTML = pm.guide || '';
+      guideEl.classList.toggle('hidden', !pm.guide);
+    }
     this.renderTabs();
     if (this.active) this.triggerFullDrop();
     this.renderBoard();
