@@ -2325,6 +2325,8 @@ class ActionGame {
       // 異色: バリアに弾かれて反撃を受ける(ダメージなし)
       this.addFloatingText(en.x - 10, en.y - 12, '🛡 バリア！色が違う！', '#94a3b8');
       sfx.play('hit');
+      // バリアに弾かれても攻撃は当たっているので凍ったマスが1つ解ける
+      this.thawFrozenCell();
       if (en.counterCd <= 0) {
         en.counterCd = 45;
         this.fireBossVolley(en, 3, 2.6);
